@@ -1,5 +1,9 @@
 """Public package surface for ml4t-models."""
 
+from __future__ import annotations
+
+from importlib import import_module
+
 __version__ = "0.1.0a0"
 
 from ml4t.models.api import (
@@ -63,12 +67,6 @@ from ml4t.models.pipelines import (
     LatentFactorForecastPipeline,
     PortfolioAllocationPipeline,
     PortfolioPipelineFitResult,
-)
-from ml4t.models.portfolio import (
-    DeepPortfolioModel,
-    LinearFeaturePortfolioModel,
-    LSTMPortfolioModel,
-    WeightConstraintPostprocessor,
 )
 from ml4t.models.stochastic_discount_factor import (
     LinearStochasticDiscountFactorReturnMapper,
@@ -168,3 +166,22 @@ __all__ = [
     "WeightConstraintPostprocessor",
     "write_backtest_surfaces",
 ]
+
+
+def __getattr__(name: str):
+    module_map = {
+        "DeepPortfolioModel": ("ml4t.models.portfolio.deep_portfolio", "DeepPortfolioModel"),
+        "LinearFeaturePortfolioModel": ("ml4t.models.portfolio.linear", "LinearFeaturePortfolioModel"),
+        "LSTMPortfolioModel": ("ml4t.models.portfolio.lstm", "LSTMPortfolioModel"),
+        "WeightConstraintPostprocessor": (
+            "ml4t.models.portfolio.postprocessors",
+            "WeightConstraintPostprocessor",
+        ),
+    }
+    if name not in module_map:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module_name, attr_name = module_map[name]
+    module = import_module(module_name)
+    value = getattr(module, attr_name)
+    globals()[name] = value
+    return value
