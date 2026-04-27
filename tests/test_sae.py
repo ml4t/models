@@ -68,3 +68,39 @@ def test_sae_requires_returns_for_training() -> None:
 
     with pytest.raises(ValueError):
         model.fit(batch)
+
+
+def test_sae_prefers_continuous_factor_returns_for_extraction() -> None:
+    rng = np.random.default_rng(5)
+    n_periods = 6
+    n_assets = 7
+    n_features = 3
+
+    characteristics = rng.normal(size=(n_periods, n_assets, n_features))
+    continuous_returns = rng.normal(size=(n_periods, n_assets))
+    labels = (continuous_returns > 0).astype(np.float64)
+
+    batch = CrossSectionBatch(
+        characteristics=characteristics,
+        returns=labels,
+        factor_returns=continuous_returns,
+        timestamps=tuple(f"2024-{month:02d}" for month in range(1, n_periods + 1)),
+    )
+
+    model = SAEModel(
+        SAEConfig(
+            n_factors=1,
+            hidden_units=(1, 8, 8, 8, 8, 8),
+            dropout_rates=(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            n_epochs=5,
+            checkpoint_interval=5,
+            n_ensemble=1,
+            task_type="classification",
+        )
+    )
+    model.fit(batch)
+    state = model.extract(batch, checkpoint=5)
+
+    assert state.factor_returns is not None
+    assert state.factor_returns.shape == (n_periods, 1)
+    assert np.isfinite(state.factor_returns).any()

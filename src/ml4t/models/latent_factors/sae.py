@@ -191,9 +191,11 @@ class SAEModel(BaseLatentFactorModel[SAEConfig]):
         output_activation = "sigmoid" if self.config.task_type == "classification" else "linear"
 
         mask = _resolve_mask(cross_section)
-        returns = None
-        if cross_section.returns is not None:
-            returns = np.asarray(cross_section.returns, dtype=np.float64)
+        factor_targets = None
+        if cross_section.factor_returns is not None:
+            factor_targets = np.asarray(cross_section.factor_returns, dtype=np.float64)
+        elif cross_section.returns is not None:
+            factor_targets = np.asarray(cross_section.returns, dtype=np.float64)
 
         ensemble_betas: list[np.ndarray] = []
         ensemble_factors: list[np.ndarray] = []
@@ -212,7 +214,7 @@ class SAEModel(BaseLatentFactorModel[SAEConfig]):
                 torch=torch,
                 model=model,
                 characteristics=cross_section.characteristics,
-                returns=returns,
+                returns=factor_targets,
                 mask=mask,
                 n_factors=self.config.n_factors,
                 device=device,
@@ -223,7 +225,7 @@ class SAEModel(BaseLatentFactorModel[SAEConfig]):
 
         asset_betas = np.nanmean(np.stack(ensemble_betas, axis=0), axis=0)
         factor_returns = None
-        if returns is not None and ensemble_factors:
+        if factor_targets is not None and ensemble_factors:
             factor_returns = np.nanmean(np.stack(ensemble_factors, axis=0), axis=0)
 
         return LatentFactorState(
