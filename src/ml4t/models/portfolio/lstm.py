@@ -12,9 +12,20 @@ class LSTMPortfolioModel(BasePortfolioModel):
 
     def __init__(self, config: LSTMPortfolioConfig) -> None:
         super().__init__(config)
+        self.config: LSTMPortfolioConfig = config
 
-    def fit(self, batch: PortfolioSequenceBatch) -> FitSummary:
+    def fit(
+        self,
+        batch: PortfolioSequenceBatch,
+        *,
+        validation_batch: PortfolioSequenceBatch | None = None,
+    ) -> FitSummary:
         raise NotImplementedError("LSTM portfolio learner not implemented yet")
 
-    def predict(self, batch: PortfolioSequenceBatch) -> PortfolioWeightsResult:
+    def predict(
+        self,
+        batch: PortfolioSequenceBatch,
+        *,
+        checkpoint: int | None = None,
+    ) -> PortfolioWeightsResult:
         raise NotImplementedError("LSTM portfolio learner not implemented yet")

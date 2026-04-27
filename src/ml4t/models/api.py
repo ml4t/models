@@ -13,7 +13,7 @@ from ml4t.models.types import (
     PersistentPanelBatch,
     PortfolioSequenceBatch,
     PortfolioWeightsResult,
-    SDFState,
+    StochasticDiscountFactorState,
 )
 
 PanelBatch = PersistentPanelBatch | CrossSectionBatch
@@ -59,12 +59,22 @@ class PortfolioModel(Protocol):
 
     is_fitted: bool
 
-    def fit(self, batch: PortfolioSequenceBatch) -> FitSummary: ...
+    def fit(
+        self,
+        batch: PortfolioSequenceBatch,
+        *,
+        validation_batch: PortfolioSequenceBatch | None = None,
+    ) -> FitSummary: ...
 
-    def predict(self, batch: PortfolioSequenceBatch) -> PortfolioWeightsResult: ...
+    def predict(
+        self,
+        batch: PortfolioSequenceBatch,
+        *,
+        checkpoint: int | None = None,
+    ) -> PortfolioWeightsResult: ...
 
 
-class StochasticDiscountFactorModel(Protocol):
+class StochasticDiscountFactorEstimator(Protocol):
     """Protocol for stochastic discount factor models with weight-native outputs."""
 
     is_fitted: bool
@@ -76,4 +86,4 @@ class StochasticDiscountFactorModel(Protocol):
         batch: CrossSectionBatch,
         *,
         checkpoint: int | None = None,
-    ) -> SDFState: ...
+    ) -> StochasticDiscountFactorState: ...

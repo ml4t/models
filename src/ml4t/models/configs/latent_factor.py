@@ -71,10 +71,10 @@ class SAEConfig(LatentFactorConfig):
 
 
 @dataclass(frozen=True, slots=True)
-class SDFConfig(BaseModelConfig):
-    """Config for SDF networks."""
+class StochasticDiscountFactorConfig(BaseModelConfig):
+    """Config for stochastic discount factor networks."""
 
-    model_name: str = "sdf"
+    model_name: str = "stochastic_discount_factor"
     output_mode: str = "weights"
     state_dim_sdf: int = 4
     state_dim_moment: int = 32

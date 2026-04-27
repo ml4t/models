@@ -3,12 +3,17 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from ml4t.models import CrossSectionBatch, LinearSDFReturnMapper, SDFConfig, SDFModel
+from ml4t.models import (
+    CrossSectionBatch,
+    LinearStochasticDiscountFactorReturnMapper,
+    StochasticDiscountFactorConfig,
+    StochasticDiscountFactorModel,
+)
 
 pytest.importorskip("torch")
 
 
-def test_sdf_extracts_checkpointed_weight_state_and_optional_return_mapping() -> None:
+def test_stochastic_discount_factor_extracts_checkpointed_weight_state_and_mapping() -> None:
     rng = np.random.default_rng(23)
     n_periods = 8
     n_assets = 6
@@ -35,8 +40,8 @@ def test_sdf_extracts_checkpointed_weight_state_and_optional_return_mapping() ->
         asset_ids=tuple(f"A{i}" for i in range(n_assets)),
     )
 
-    model = SDFModel(
-        SDFConfig(
+    model = StochasticDiscountFactorModel(
+        StochasticDiscountFactorConfig(
             state_dim_sdf=2,
             state_dim_moment=4,
             hidden_dim=8,
@@ -53,7 +58,7 @@ def test_sdf_extracts_checkpointed_weight_state_and_optional_return_mapping() ->
     train_state = model.extract(train, checkpoint=2)
     future_state = model.extract(future, checkpoint=8)
 
-    mapper = LinearSDFReturnMapper()
+    mapper = LinearStochasticDiscountFactorReturnMapper()
     mapper_fit = mapper.fit(train_state, train)
     forecast = mapper.predict(future_state)
 
@@ -69,12 +74,14 @@ def test_sdf_extracts_checkpointed_weight_state_and_optional_return_mapping() ->
     assert forecast.expected_returns.shape == (3, n_assets)
 
 
-def test_sdf_model_rejects_non_weight_native_output_mode() -> None:
+def test_stochastic_discount_factor_rejects_non_weight_native_output_mode() -> None:
     batch = CrossSectionBatch(
         characteristics=np.zeros((2, 3, 2), dtype=np.float64),
         returns=np.zeros((2, 3), dtype=np.float64),
     )
-    model = SDFModel(SDFConfig(output_mode="expected_returns"))
+    model = StochasticDiscountFactorModel(
+        StochasticDiscountFactorConfig(output_mode="expected_returns")
+    )
 
     with pytest.raises(ValueError):
         model.fit(batch)

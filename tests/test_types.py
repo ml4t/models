@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from ml4t.models import CrossSectionBatch, PersistentPanelBatch
+from ml4t.models import CrossSectionBatch, PersistentPanelBatch, PortfolioSequenceBatch
 
 
 def test_persistent_panel_can_infer_shape_from_metadata_only() -> None:
@@ -37,3 +37,14 @@ def test_cross_section_batch_validates_context_alignment() -> None:
             characteristics=np.zeros((2, 3, 4), dtype=np.float64),
             context_features=np.zeros((3, 2), dtype=np.float64),
         )
+
+
+def test_portfolio_sequence_batch_normalizes_cost_shape() -> None:
+    batch = PortfolioSequenceBatch(
+        features=np.zeros((2, 4, 3, 5), dtype=np.float64),
+        returns=np.zeros((2, 4, 3), dtype=np.float64),
+        vol_scale=np.ones((2, 4, 3), dtype=np.float64),
+        costs=np.array([0.001, 0.002, 0.003], dtype=np.float64),
+    )
+    assert batch.costs is not None
+    assert batch.costs.shape == (3, 1)

@@ -7,11 +7,12 @@ from ml4t.models.api import (
     FactorForecaster,
     LatentFactorModel,
     PortfolioModel,
-    StochasticDiscountFactorModel,
+    StochasticDiscountFactorEstimator,
 )
 from ml4t.models.configs import (
     AR1ForecasterConfig,
     CAEConfig,
+    DeepPortfolioConfig,
     EWMABaseForecasterConfig,
     ExpandingMeanForecasterConfig,
     IPCAConfig,
@@ -22,7 +23,7 @@ from ml4t.models.configs import (
     PipelineConfig,
     PortfolioConfig,
     SAEConfig,
-    SDFConfig,
+    StochasticDiscountFactorConfig,
 )
 from ml4t.models.forecasters import (
     AR1FactorForecaster,
@@ -32,7 +33,11 @@ from ml4t.models.forecasters import (
 from ml4t.models.latent_factors import CAEModel, IPCAModel, PCAModel, SAEModel
 from ml4t.models.mappers import BetaLambdaMapper
 from ml4t.models.pipelines import LatentFactorForecastPipeline
-from ml4t.models.sdf import LinearSDFReturnMapper, SDFModel
+from ml4t.models.portfolio import DeepPortfolioModel
+from ml4t.models.stochastic_discount_factor import (
+    LinearStochasticDiscountFactorReturnMapper,
+    StochasticDiscountFactorModel,
+)
 from ml4t.models.types import (
     AssetForecastResult,
     AssetWeightsResult,
@@ -44,7 +49,7 @@ from ml4t.models.types import (
     PersistentPanelBatch,
     PortfolioSequenceBatch,
     PortfolioWeightsResult,
-    SDFState,
+    StochasticDiscountFactorState,
 )
 
 __all__ = [
@@ -57,6 +62,8 @@ __all__ = [
     "CAEConfig",
     "CAEModel",
     "CrossSectionBatch",
+    "DeepPortfolioConfig",
+    "DeepPortfolioModel",
     "EWMABaseFactorForecaster",
     "EWMABaseForecasterConfig",
     "ExpandingMeanFactorForecaster",
@@ -72,7 +79,7 @@ __all__ = [
     "LatentFactorPrediction",
     "LatentFactorState",
     "LSTMPortfolioConfig",
-    "LinearSDFReturnMapper",
+    "LinearStochasticDiscountFactorReturnMapper",
     "MapperConfig",
     "PCAConfig",
     "PCAModel",
@@ -84,8 +91,8 @@ __all__ = [
     "PortfolioWeightsResult",
     "SAEConfig",
     "SAEModel",
-    "SDFConfig",
-    "SDFModel",
-    "SDFState",
+    "StochasticDiscountFactorConfig",
+    "StochasticDiscountFactorEstimator",
     "StochasticDiscountFactorModel",
+    "StochasticDiscountFactorState",
 ]

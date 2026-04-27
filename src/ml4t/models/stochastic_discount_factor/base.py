@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from ml4t.models.configs import SDFConfig
-from ml4t.models.types import CrossSectionBatch, FitSummary, SDFState
+from ml4t.models.configs import StochasticDiscountFactorConfig
+from ml4t.models.types import CrossSectionBatch, FitSummary, StochasticDiscountFactorState
 
 
-class BaseSDFModel(ABC):
+class BaseStochasticDiscountFactorModel(ABC):
     """Abstract base for stochastic discount factor models."""
 
-    def __init__(self, config: SDFConfig) -> None:
+    def __init__(self, config: StochasticDiscountFactorConfig) -> None:
         self.config = config
         self._is_fitted = False
 
@@ -25,7 +25,7 @@ class BaseSDFModel(ABC):
 
     @abstractmethod
     def fit(self, batch: CrossSectionBatch) -> FitSummary:
-        """Fit the SDF model on a dated cross-sectional batch."""
+        """Fit the stochastic discount factor model on a dated cross-sectional batch."""
 
     @abstractmethod
     def extract(
@@ -33,8 +33,8 @@ class BaseSDFModel(ABC):
         batch: CrossSectionBatch,
         *,
         checkpoint: int | None = None,
-    ) -> SDFState:
-        """Extract the structural SDF state from a batch."""
+    ) -> StochasticDiscountFactorState:
+        """Extract the structural stochastic discount factor state from a batch."""
 
     def _mark_fitted(self) -> None:
         self._is_fitted = True

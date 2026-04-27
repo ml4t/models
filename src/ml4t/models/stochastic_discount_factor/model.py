@@ -13,15 +13,15 @@ from ml4t.models._internal.latent_factor_utils import (
     select_checkpoint_epoch,
 )
 from ml4t.models._internal.torch_runtime import import_torch, resolve_device, seed_torch
-from ml4t.models.configs import SDFConfig
-from ml4t.models.sdf.base import BaseSDFModel
-from ml4t.models.types import CrossSectionBatch, FitSummary, SDFState
+from ml4t.models.configs import StochasticDiscountFactorConfig
+from ml4t.models.stochastic_discount_factor.base import BaseStochasticDiscountFactorModel
+from ml4t.models.types import CrossSectionBatch, FitSummary, StochasticDiscountFactorState
 
 
-class SDFModel(BaseSDFModel):
+class StochasticDiscountFactorModel(BaseStochasticDiscountFactorModel):
     """Stochastic discount factor model with weight-native structural outputs."""
 
-    def __init__(self, config: SDFConfig) -> None:
+    def __init__(self, config: StochasticDiscountFactorConfig) -> None:
         super().__init__(config)
         self._checkpoint_states: dict[int, dict[str, dict[str, Any]]] = {}
         self._asset_ids: tuple[str, ...] = ()
@@ -35,14 +35,16 @@ class SDFModel(BaseSDFModel):
 
     def fit(self, batch: CrossSectionBatch) -> FitSummary:
         if batch.returns is None:
-            raise ValueError("SDF requires returns in the training batch")
+            raise ValueError("Stochastic discount factor training requires returns in the batch")
         if self.config.output_mode != "weights":
-            raise ValueError("SDFModel is weight-native; use a mapper for expected-return output")
+            raise ValueError(
+                "StochasticDiscountFactorModel is weight-native; use a mapper for expected-return output"
+            )
         if self.config.expected_return_mapper != "linear":
             raise ValueError("expected_return_mapper must be 'linear'")
 
         torch = import_torch()
-        nn = _import_sdf_nn()
+        nn = _import_stochastic_discount_factor_nn()
         device = resolve_device(torch, self.config.device)
 
         returns_raw = torch.as_tensor(np.asarray(batch.returns, dtype=np.float32), device=device)
@@ -50,7 +52,7 @@ class SDFModel(BaseSDFModel):
         returns = torch.where(mask, returns_raw, torch.zeros_like(returns_raw))
         n_obs_per_asset = mask.float().sum(dim=0)
         if int(mask.sum().item()) == 0:
-            raise ValueError("SDF received no valid training observations")
+            raise ValueError("Stochastic discount factor training received no valid observations")
 
         asset_features = torch.as_tensor(
             np.asarray(batch.characteristics, dtype=np.float32),
@@ -65,7 +67,7 @@ class SDFModel(BaseSDFModel):
                 device=device,
             )
 
-        sdf_net = nn.SDFNetwork(
+        stochastic_discount_factor_net = nn.StochasticDiscountFactorNetwork(
             n_asset_features=batch.characteristics.shape[2],
             n_context_features=0 if context_features is None else context_features.shape[1],
             state_dim=self.config.state_dim_sdf,
@@ -84,7 +86,7 @@ class SDFModel(BaseSDFModel):
         np.random.seed(self.config.seed)
 
         sdf_optimizer = torch.optim.Adam(
-            sdf_net.parameters(),
+            stochastic_discount_factor_net.parameters(),
             lr=self.config.lr,
             weight_decay=self.config.weight_decay,
         )
@@ -108,14 +110,20 @@ class SDFModel(BaseSDFModel):
 
         for _ in range(self.config.n_epochs_unc):
             sdf_epoch += 1
-            sdf_net.train()
-            weights, _ = sdf_net(asset_features, context_features=context_features, mask=mask)
-            loss, sdf_values = nn.unconditional_loss(weights, returns, mask, n_obs_per_asset)
+            stochastic_discount_factor_net.train()
+            weights, _ = stochastic_discount_factor_net(
+                asset_features,
+                context_features=context_features,
+                mask=mask,
+            )
+            loss, stochastic_discount_factor_values = nn.unconditional_loss(
+                weights, returns, mask, n_obs_per_asset
+            )
             sdf_optimizer.zero_grad(set_to_none=True)
             loss.backward()
             sdf_optimizer.step()
 
-            sharpe = nn.compute_sharpe(sdf_values)
+            sharpe = nn.compute_sharpe(stochastic_discount_factor_values)
             history.append(
                 {
                     "epoch": float(sdf_epoch),
@@ -127,17 +135,21 @@ class SDFModel(BaseSDFModel):
             self._maybe_store_checkpoint(
                 epoch=sdf_epoch,
                 checkpoint_epochs=checkpoint_epochs,
-                sdf_net=sdf_net,
+                stochastic_discount_factor_net=stochastic_discount_factor_net,
                 moment_net=moment_net,
             )
 
         best_moment_state = deepcopy(moment_net.state_dict())
         best_moment_loss = float("-inf")
         for _ in range(self.config.n_epochs_moment):
-            sdf_net.eval()
+            stochastic_discount_factor_net.eval()
             moment_net.train()
             with torch.no_grad():
-                weights, _ = sdf_net(asset_features, context_features=context_features, mask=mask)
+                weights, _ = stochastic_discount_factor_net(
+                    asset_features,
+                    context_features=context_features,
+                    mask=mask,
+                )
             instruments, _ = moment_net(asset_features, context_features=context_features)
             loss, _ = nn.conditional_loss(weights, instruments, returns, mask, n_obs_per_asset)
             moment_optimizer.zero_grad(set_to_none=True)
@@ -152,19 +164,23 @@ class SDFModel(BaseSDFModel):
 
         for _ in range(self.config.n_epochs_cond):
             sdf_epoch += 1
-            sdf_net.train()
+            stochastic_discount_factor_net.train()
             moment_net.eval()
-            weights, _ = sdf_net(asset_features, context_features=context_features, mask=mask)
+            weights, _ = stochastic_discount_factor_net(
+                asset_features,
+                context_features=context_features,
+                mask=mask,
+            )
             with torch.no_grad():
                 instruments, _ = moment_net(asset_features, context_features=context_features)
-            loss, sdf_values = nn.conditional_loss(
+            loss, stochastic_discount_factor_values = nn.conditional_loss(
                 weights, instruments, returns, mask, n_obs_per_asset
             )
             sdf_optimizer.zero_grad(set_to_none=True)
             loss.backward()
             sdf_optimizer.step()
 
-            sharpe = nn.compute_sharpe(sdf_values)
+            sharpe = nn.compute_sharpe(stochastic_discount_factor_values)
             history.append(
                 {
                     "epoch": float(sdf_epoch),
@@ -176,7 +192,7 @@ class SDFModel(BaseSDFModel):
             self._maybe_store_checkpoint(
                 epoch=sdf_epoch,
                 checkpoint_epochs=checkpoint_epochs,
-                sdf_net=sdf_net,
+                stochastic_discount_factor_net=stochastic_discount_factor_net,
                 moment_net=moment_net,
             )
 
@@ -200,7 +216,9 @@ class SDFModel(BaseSDFModel):
                 available=checkpoint_epochs,
             ),
             history=self._history,
-            notes=("Phase-aware SDF training with weight-native checkpoint extraction.",),
+            notes=(
+                "Phase-aware stochastic discount factor training with weight-native checkpoint extraction.",
+            ),
         )
 
     def extract(
@@ -208,12 +226,13 @@ class SDFModel(BaseSDFModel):
         batch: CrossSectionBatch,
         *,
         checkpoint: int | None = None,
-    ) -> SDFState:
+    ) -> StochasticDiscountFactorState:
         if not self.is_fitted or self._n_characteristics is None or not self._checkpoint_states:
-            raise RuntimeError("SDF model must be fitted before extract()")
+            raise RuntimeError("StochasticDiscountFactorModel must be fitted before extract()")
         if batch.characteristics.shape[2] != self._n_characteristics:
             raise ValueError(
-                "characteristics feature dimension does not match fitted SDF model; "
+                "characteristics feature dimension does not match the fitted stochastic discount "
+                "factor model; "
                 f"expected {self._n_characteristics}, got {batch.characteristics.shape[2]}"
             )
         n_context_features = (
@@ -221,12 +240,13 @@ class SDFModel(BaseSDFModel):
         )
         if n_context_features != self._n_context_features:
             raise ValueError(
-                "context feature dimension does not match fitted SDF model; "
+                "context feature dimension does not match the fitted stochastic discount factor "
+                "model; "
                 f"expected {self._n_context_features}, got {n_context_features}"
             )
 
         torch = import_torch()
-        nn = _import_sdf_nn()
+        nn = _import_stochastic_discount_factor_nn()
         device = resolve_device(torch, self.config.device)
         selected_checkpoint = select_checkpoint_epoch(
             checkpoint=checkpoint,
@@ -235,15 +255,17 @@ class SDFModel(BaseSDFModel):
         )
         checkpoint_state = self._checkpoint_states[selected_checkpoint]
 
-        sdf_net = nn.SDFNetwork(
+        stochastic_discount_factor_net = nn.StochasticDiscountFactorNetwork(
             n_asset_features=self._n_characteristics,
             n_context_features=self._n_context_features,
             state_dim=self.config.state_dim_sdf,
             hidden_dim=self.config.hidden_dim,
             dropout=self.config.dropout,
         ).to(device)
-        sdf_net.load_state_dict(deepcopy(checkpoint_state["sdf"]))
-        sdf_net.eval()
+        stochastic_discount_factor_net.load_state_dict(
+            deepcopy(checkpoint_state["stochastic_discount_factor"])
+        )
+        stochastic_discount_factor_net.eval()
 
         asset_features = torch.as_tensor(
             np.asarray(batch.characteristics, dtype=np.float32),
@@ -260,7 +282,11 @@ class SDFModel(BaseSDFModel):
         mask = _resolve_mask(batch, torch, device)
 
         with torch.no_grad():
-            weights_flat, _ = sdf_net(asset_features, context_features=context_features, mask=mask)
+            weights_flat, _ = stochastic_discount_factor_net(
+                asset_features,
+                context_features=context_features,
+                mask=mask,
+            )
         asset_weights = _reshape_weight_panel(
             weights=weights_flat.detach().cpu().numpy().astype(np.float64),
             mask=mask.detach().cpu().numpy(),
@@ -272,10 +298,10 @@ class SDFModel(BaseSDFModel):
             returns = torch.as_tensor(np.asarray(batch.returns, dtype=np.float32), device=device)
             returns = torch.where(mask, returns, torch.zeros_like(returns))
             with torch.no_grad():
-                sdf_series = nn.construct_sdf(returns, weights_flat, mask)
+                sdf_series = nn.construct_stochastic_discount_factor(returns, weights_flat, mask)
             sdf_values = sdf_series.detach().cpu().numpy().astype(np.float64)
 
-        return SDFState(
+        return StochasticDiscountFactorState(
             asset_weights=asset_weights,
             sdf_values=sdf_values,
             checkpoint_epoch=selected_checkpoint,
@@ -293,13 +319,13 @@ class SDFModel(BaseSDFModel):
         *,
         epoch: int,
         checkpoint_epochs: tuple[int, ...],
-        sdf_net: Any,
+        stochastic_discount_factor_net: Any,
         moment_net: Any,
     ) -> None:
         if epoch <= self.config.burn_in_epochs or epoch not in checkpoint_epochs:
             return
         self._checkpoint_states[epoch] = {
-            "sdf": _cpu_state_dict(sdf_net),
+            "stochastic_discount_factor": _cpu_state_dict(stochastic_discount_factor_net),
             "moment": _cpu_state_dict(moment_net),
         }
 
@@ -333,7 +359,7 @@ def _cpu_state_dict(model: Any) -> dict[str, Any]:
     return {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
 
 
-def _import_sdf_nn() -> Any:
-    from ml4t.models._internal import sdf_nn
+def _import_stochastic_discount_factor_nn() -> Any:
+    from ml4t.models._internal import stochastic_discount_factor_nn
 
-    return sdf_nn
+    return stochastic_discount_factor_nn

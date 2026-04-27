@@ -6,8 +6,8 @@ import torch
 import torch.nn as nn
 
 
-class SDFNetwork(nn.Module):
-    """Learn cross-sectional SDF weights from characteristics and optional context."""
+class StochasticDiscountFactorNetwork(nn.Module):
+    """Learn cross-sectional stochastic discount factor weights from characteristics and context."""
 
     def __init__(
         self,
@@ -141,12 +141,12 @@ def get_segment_ids(mask: torch.Tensor) -> torch.Tensor:
     return time_ids[mask]
 
 
-def construct_sdf(
+def construct_stochastic_discount_factor(
     returns: torch.Tensor,
     weights: torch.Tensor,
     mask: torch.Tensor,
 ) -> torch.Tensor:
-    """Construct the dated SDF series from cross-sectional weights."""
+    """Construct the dated stochastic discount factor series from cross-sectional weights."""
 
     weighted_returns = weights * returns[mask]
     sdf_values = torch.zeros(returns.shape[0], device=weights.device, dtype=weights.dtype)
@@ -162,12 +162,14 @@ def unconditional_loss(
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Unconditional pricing loss with a constant instrument."""
 
-    sdf = construct_sdf(returns, weights, mask)
-    sample_moments = (returns * mask.float() * sdf.unsqueeze(1)).unsqueeze(0)
+    stochastic_discount_factor = construct_stochastic_discount_factor(returns, weights, mask)
+    sample_moments = (
+        returns * mask.float() * stochastic_discount_factor.unsqueeze(1)
+    ).unsqueeze(0)
     weighted_moments = sample_moments.sum(dim=1) / n_obs_per_asset.clamp(min=1).unsqueeze(0)
     n_obs_norm = n_obs_per_asset / n_obs_per_asset.max().clamp(min=1)
     loss = (weighted_moments.pow(2) * n_obs_norm).mean()
-    return loss, sdf
+    return loss, stochastic_discount_factor
 
 
 def conditional_loss(
@@ -180,21 +182,27 @@ def conditional_loss(
     """Conditional pricing loss with learned instruments."""
 
     n_instruments = instruments.shape[0]
-    sdf = construct_sdf(returns, weights, mask)
-    sample_moments = returns * mask.float() * sdf.unsqueeze(1) * instruments
+    stochastic_discount_factor = construct_stochastic_discount_factor(returns, weights, mask)
+    sample_moments = (
+        returns * mask.float() * stochastic_discount_factor.unsqueeze(1) * instruments
+    )
     weighted_moments = sample_moments.sum(dim=1) / n_obs_per_asset.clamp(min=1).unsqueeze(0)
     n_obs_norm = n_obs_per_asset / n_obs_per_asset.max().clamp(min=1)
     tiled = n_obs_norm.unsqueeze(0).expand(n_instruments, -1)
     loss = (weighted_moments.pow(2) * tiled).mean()
-    return loss, sdf
+    return loss, stochastic_discount_factor
 
 
-def compute_sharpe(sdf: torch.Tensor) -> torch.Tensor:
-    """Sharpe ratio of the portfolio induced by the SDF."""
+def compute_sharpe(stochastic_discount_factor: torch.Tensor) -> torch.Tensor:
+    """Sharpe ratio of the portfolio induced by the stochastic discount factor."""
 
-    portfolio_return = 1.0 - sdf
+    portfolio_return = 1.0 - stochastic_discount_factor
     if portfolio_return.numel() == 0:
-        return torch.zeros((), device=sdf.device, dtype=sdf.dtype)
+        return torch.zeros(
+            (),
+            device=stochastic_discount_factor.device,
+            dtype=stochastic_discount_factor.dtype,
+        )
     mean = portfolio_return.mean()
     std = portfolio_return.std(unbiased=False).clamp(min=1e-8)
     out = mean / std

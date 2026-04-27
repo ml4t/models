@@ -19,10 +19,27 @@ class BasePortfolioModel(ABC):
     def is_fitted(self) -> bool:
         return self._is_fitted
 
+    @property
+    def available_checkpoints(self) -> tuple[int, ...]:
+        return ()
+
     @abstractmethod
-    def fit(self, batch: PortfolioSequenceBatch) -> FitSummary:
+    def fit(
+        self,
+        batch: PortfolioSequenceBatch,
+        *,
+        validation_batch: PortfolioSequenceBatch | None = None,
+    ) -> FitSummary:
         """Fit the portfolio model."""
 
     @abstractmethod
-    def predict(self, batch: PortfolioSequenceBatch) -> PortfolioWeightsResult:
+    def predict(
+        self,
+        batch: PortfolioSequenceBatch,
+        *,
+        checkpoint: int | None = None,
+    ) -> PortfolioWeightsResult:
         """Emit implementable portfolio weights."""
+
+    def _mark_fitted(self) -> None:
+        self._is_fitted = True

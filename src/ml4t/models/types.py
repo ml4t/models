@@ -152,7 +152,12 @@ class PortfolioSequenceBatch:
 
     features: Array4D
     returns: Array3D | None = None
+    vol_scale: Array3D | None = None
     prev_weights: Array2D | None = None
+    mask: NDArray[np.bool_] | None = None
+    group_ids: NDArray[np.int64] | None = None
+    costs: Array2D | None = None
+    adjacency_mask: NDArray[np.bool_] | None = None
     timestamps: tuple[Any, ...] = ()
     asset_ids: tuple[str, ...] = ()
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -160,10 +165,12 @@ class PortfolioSequenceBatch:
     def __post_init__(self) -> None:
         features = _coerce_float_array(self.features, ndim=4, name="features")
         returns = _coerce_float_array(self.returns, ndim=3, name="returns")
+        vol_scale = _coerce_float_array(self.vol_scale, ndim=3, name="vol_scale")
         prev_weights = _coerce_float_array(self.prev_weights, ndim=2, name="prev_weights")
         assert features is not None
         object.__setattr__(self, "features", features)
         object.__setattr__(self, "returns", returns)
+        object.__setattr__(self, "vol_scale", vol_scale)
         object.__setattr__(self, "prev_weights", prev_weights)
 
         batch_size, _, n_assets, _ = features.shape
@@ -171,10 +178,41 @@ class PortfolioSequenceBatch:
             raise ValueError("returns and features disagree on (B, T)")
         if returns is not None and returns.shape[2] != n_assets:
             raise ValueError("returns and features disagree on N")
+        if vol_scale is not None and vol_scale.shape != features.shape[:3]:
+            raise ValueError("vol_scale and features disagree on (B, T, N)")
         if prev_weights is not None and prev_weights.shape != (batch_size, n_assets):
             raise ValueError("prev_weights must have shape (B, N)")
+        if self.mask is not None and np.asarray(self.mask).shape != features.shape[:3]:
+            raise ValueError("mask must match (B, T, N)")
+        if self.group_ids is not None and np.asarray(self.group_ids).shape != (n_assets,):
+            raise ValueError("group_ids must have shape (N,)")
+        costs = None
+        if self.costs is not None:
+            costs = np.asarray(self.costs, dtype=np.float64)
+            if costs.ndim == 1:
+                costs = costs[:, None]
+            if costs.ndim != 2 or costs.shape != (n_assets, 1):
+                raise ValueError("costs must have shape (N,) or (N, 1)")
+        object.__setattr__(self, "costs", costs)
+        if self.adjacency_mask is not None and np.asarray(self.adjacency_mask).shape != (
+            n_assets,
+            n_assets,
+        ):
+            raise ValueError("adjacency_mask must have shape (N, N)")
         if self.asset_ids and len(self.asset_ids) != n_assets:
             raise ValueError("asset_ids length does not match N")
+
+    @property
+    def batch_size(self) -> int:
+        return self.features.shape[0]
+
+    @property
+    def n_periods(self) -> int:
+        return self.features.shape[1]
+
+    @property
+    def n_assets(self) -> int:
+        return self.features.shape[2]
 
 
 @dataclass(slots=True, frozen=True)
@@ -289,7 +327,7 @@ class AssetWeightsResult:
 
 
 @dataclass(slots=True, frozen=True)
-class SDFState:
+class StochasticDiscountFactorState:
     """Structural state extracted from a stochastic discount factor model."""
 
     asset_weights: Array2D
@@ -327,6 +365,7 @@ class PortfolioWeightsResult:
     """Portfolio-weight output for end-to-end allocators."""
 
     weights: Array3D
+    checkpoint_step: int | None = None
     timestamps: tuple[Any, ...] = ()
     asset_ids: tuple[str, ...] = ()
     metadata: dict[str, Any] = field(default_factory=dict)
