@@ -78,14 +78,14 @@ class StochasticDiscountFactorConfig(BaseModelConfig):
     n_epochs_unc: int = 256
     n_epochs_moment: int = 64
     n_epochs_cond: int = 1024
-    checkpoint_interval: int | None = 5
+    checkpoint_interval: int | None = None
     checkpoint_epochs: tuple[int, ...] = ()
     default_checkpoint: int | None = None
     expected_return_mapper: str = "linear"
     beta_state_dim: int = 4
     beta_hidden_dim: int = 64
     beta_n_epochs: int = 256
-    beta_checkpoint_interval: int | None = 16
+    beta_checkpoint_interval: int | None = None
     beta_checkpoint_epochs: tuple[int, ...] = ()
     beta_default_checkpoint: int | None = None
     beta_lr: float = 1e-3
