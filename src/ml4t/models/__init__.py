@@ -32,6 +32,12 @@ from ml4t.models.forecasters import (
     EWMABaseFactorForecaster,
     ExpandingMeanFactorForecaster,
 )
+from ml4t.models.integration import (
+    ResolvedDatasetSchema,
+    cross_section_batch_from_long_frame,
+    persistent_panel_batch_from_long_frame,
+    resolve_dataset_schema,
+)
 from ml4t.models.latent_factors import CAEModel, IPCAModel, PCAModel, SAEModel
 from ml4t.models.mappers import BetaLambdaMapper
 from ml4t.models.pipelines import (
@@ -110,6 +116,10 @@ __all__ = [
     "PortfolioWeightsResult",
     "SAEConfig",
     "SAEModel",
+    "ResolvedDatasetSchema",
+    "cross_section_batch_from_long_frame",
+    "persistent_panel_batch_from_long_frame",
+    "resolve_dataset_schema",
     "StochasticDiscountFactorConfig",
     "StochasticDiscountFactorEstimator",
     "StochasticDiscountFactorModel",
