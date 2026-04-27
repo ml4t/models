@@ -1,0 +1,131 @@
+site_name: ML4T Models
+site_description: Finance-native model implementations for latent factors and portfolio learning
+site_url: https://ml4trading.io/docs/models/
+repo_url: https://github.com/ml4t/models
+repo_name: ml4t/models
+
+theme:
+  name: material
+  custom_dir: docs/overrides
+
+  palette:
+    scheme: default
+    primary: custom
+    accent: custom
+
+  font: false
+
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.indexes
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.footer
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+
+  icon:
+    repo: fontawesome/brands/github
+
+extra_css:
+  - stylesheets/ml4t-theme.css
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.magiclink
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            members_order: source
+            merge_init_into_class: true
+            separate_signature: true
+            signature_crossrefs: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quickstart: getting-started/quickstart.md
+  - User Guide:
+    - user-guide/index.md
+    - Data Contracts: user-guide/data-contracts.md
+    - Latent-Factor Pipelines: user-guide/latent-factor-pipelines.md
+    - Latent-Factor Models: user-guide/latent-factor-models.md
+    - Stochastic Discount Factor: user-guide/stochastic-discount-factor.md
+    - Direct Asset Prediction: user-guide/direct-asset-prediction.md
+    - Portfolio Learning: user-guide/portfolio-learning.md
+    - Integration: user-guide/integration.md
+  - API Reference:
+    - api/index.md
+  - Book Guide:
+    - book-guide/index.md
+  - Reference:
+    - Architecture: reference/architecture.md
+    - Model Families: reference/model-families.md
+    - Academic References: reference/academic-references.md
+
+extra:
+  ml4t_docs_hub_url: /docs/
+  ml4t_libraries_url: /libraries/
+  ml4t_chapters_url: /chapters/
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/stefan-jansen
+    - icon: fontawesome/brands/twitter
+      link: https://twitter.com/mlaboratory
+  generator: false
+
+copyright: Copyright &copy; 2024-2026 Stefan Jansen
+

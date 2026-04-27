@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">ml4t-models architecture</title>
+  <desc id="desc">Diagram showing finance-native data contracts feeding model families and downstream ML4T integration.</desc>
+  <rect width="1600" height="900" fill="#fafaf9"/>
+  <text x="800" y="70" text-anchor="middle" font-family="Source Serif 4, Georgia, serif" font-size="38" font-weight="700" fill="#1e293b">ml4t-models</text>
+  <text x="800" y="105" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="20" fill="#475569">Finance-native contracts and model families for asset pricing and portfolio learning</text>
+
+  <rect x="70" y="180" width="340" height="500" rx="24" fill="#ffffff" stroke="#d9ddd7" stroke-width="2"/>
+  <text x="240" y="225" text-anchor="middle" font-family="Source Serif 4, Georgia, serif" font-size="28" font-weight="700" fill="#0a1628">Data Contracts</text>
+
+  <rect x="100" y="260" width="280" height="110" rx="18" fill="#eef4fb" stroke="#b6c8df"/>
+  <text x="240" y="302" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="22" font-weight="700" fill="#0a1628">PersistentPanelBatch</text>
+  <text x="240" y="334" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="18" fill="#475569">Stable-ID return panels</text>
+
+  <rect x="100" y="395" width="280" height="110" rx="18" fill="#eef4fb" stroke="#b6c8df"/>
+  <text x="240" y="437" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="22" font-weight="700" fill="#0a1628">CrossSectionBatch</text>
+  <text x="240" y="469" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="18" fill="#475569">Ragged dated cross-sections</text>
+
+  <rect x="100" y="530" width="280" height="110" rx="18" fill="#eef4fb" stroke="#b6c8df"/>
+  <text x="240" y="572" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="22" font-weight="700" fill="#0a1628">PortfolioSequenceBatch</text>
+  <text x="240" y="604" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="18" fill="#475569">Sequence-to-allocation windows</text>
+
+  <rect x="500" y="120" width="620" height="660" rx="24" fill="#ffffff" stroke="#d9ddd7" stroke-width="2"/>
+  <text x="810" y="165" text-anchor="middle" font-family="Source Serif 4, Georgia, serif" font-size="28" font-weight="700" fill="#0a1628">Model Families</text>
+
+  <rect x="540" y="205" width="540" height="130" rx="20" fill="#f7f2e7" stroke="#d4a84b" stroke-width="2"/>
+  <text x="810" y="246" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="24" font-weight="700" fill="#0a1628">Latent Factors</text>
+  <text x="810" y="281" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="19" fill="#475569">PCA • RP-PCA • IPCA • CAE</text>
+  <text x="810" y="311" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="18" fill="#475569">Structural state → factor forecast → asset mapping</text>
+
+  <rect x="540" y="365" width="540" height="120" rx="20" fill="#edf7ef" stroke="#7faa7a" stroke-width="2"/>
+  <text x="810" y="406" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="24" font-weight="700" fill="#0a1628">Stochastic Discount Factor</text>
+  <text x="810" y="441" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="19" fill="#475569">Weight-native no-arbitrage estimation</text>
+  <text x="810" y="468" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="18" fill="#475569">Phase-aware checkpoints and optional return projections</text>
+
+  <rect x="540" y="515" width="540" height="100" rx="20" fill="#f2eefb" stroke="#a08fc9" stroke-width="2"/>
+  <text x="810" y="555" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="24" font-weight="700" fill="#0a1628">Direct Asset Prediction</text>
+  <text x="810" y="588" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="19" fill="#475569">SAE = supervised autoencoder direct signal model</text>
+
+  <rect x="540" y="645" width="540" height="100" rx="20" fill="#eaf4f7" stroke="#7caab8" stroke-width="2"/>
+  <text x="810" y="685" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="24" font-weight="700" fill="#0a1628">Portfolio Learning</text>
+  <text x="810" y="718" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="19" fill="#475569">Linear baseline • LSTM • DeePM-style allocator</text>
+
+  <rect x="1210" y="180" width="320" height="500" rx="24" fill="#ffffff" stroke="#d9ddd7" stroke-width="2"/>
+  <text x="1370" y="225" text-anchor="middle" font-family="Source Serif 4, Georgia, serif" font-size="28" font-weight="700" fill="#0a1628">Downstream</text>
+
+  <rect x="1245" y="270" width="250" height="100" rx="18" fill="#eef4fb" stroke="#b6c8df"/>
+  <text x="1370" y="312" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="22" font-weight="700" fill="#0a1628">SurfaceFrame</text>
+  <text x="1370" y="344" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="18" fill="#475569">Predictions, weights, context</text>
+
+  <rect x="1245" y="410" width="250" height="100" rx="18" fill="#eef4fb" stroke="#b6c8df"/>
+  <text x="1370" y="452" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="22" font-weight="700" fill="#0a1628">ml4t-backtest</text>
+  <text x="1370" y="484" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="18" fill="#475569">Execution and PnL</text>
+
+  <rect x="1245" y="550" width="250" height="100" rx="18" fill="#eef4fb" stroke="#b6c8df"/>
+  <text x="1370" y="592" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="22" font-weight="700" fill="#0a1628">ml4t-diagnostic</text>
+  <text x="1370" y="624" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="18" fill="#475569">Validation and reports</text>
+
+  <path d="M410 315 C455 315, 475 270, 540 270" fill="none" stroke="#0a1628" stroke-width="3"/>
+  <path d="M410 450 C455 450, 475 430, 540 430" fill="none" stroke="#0a1628" stroke-width="3"/>
+  <path d="M410 585 C455 585, 475 690, 540 690" fill="none" stroke="#0a1628" stroke-width="3"/>
+
+  <path d="M1080 270 C1140 270, 1165 320, 1245 320" fill="none" stroke="#0a1628" stroke-width="3"/>
+  <path d="M1080 430 C1140 430, 1165 460, 1245 460" fill="none" stroke="#0a1628" stroke-width="3"/>
+  <path d="M1080 690 C1140 690, 1165 600, 1245 600" fill="none" stroke="#0a1628" stroke-width="3"/>
+
+  <polygon points="535,264 550,270 535,276" fill="#0a1628"/>
+  <polygon points="535,424 550,430 535,436" fill="#0a1628"/>
+  <polygon points="535,684 550,690 535,696" fill="#0a1628"/>
+  <polygon points="1240,314 1255,320 1240,326" fill="#0a1628"/>
+  <polygon points="1240,454 1255,460 1240,466" fill="#0a1628"/>
+  <polygon points="1240,594 1255,600 1240,606" fill="#0a1628"/>
+</svg>
