@@ -9,6 +9,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 Array1D = NDArray[np.object_]
+FloatArray1D = NDArray[np.float64]
 Array2D = NDArray[np.float64]
 Array3D = NDArray[np.float64]
 Array4D = NDArray[np.float64]
@@ -101,6 +102,7 @@ class CrossSectionBatch:
     characteristics: Array3D
     returns: Array2D | None = None
     factor_returns: Array2D | None = None
+    context_features: Array2D | None = None
     timestamps: tuple[Any, ...] = ()
     asset_ids: tuple[str, ...] = ()
     mask: NDArray[np.bool_] | None = None
@@ -110,16 +112,24 @@ class CrossSectionBatch:
         characteristics = _coerce_float_array(self.characteristics, ndim=3, name="characteristics")
         returns = _coerce_float_array(self.returns, ndim=2, name="returns")
         factor_returns = _coerce_float_array(self.factor_returns, ndim=2, name="factor_returns")
+        context_features = _coerce_float_array(
+            self.context_features,
+            ndim=2,
+            name="context_features",
+        )
         assert characteristics is not None
         object.__setattr__(self, "characteristics", characteristics)
         object.__setattr__(self, "returns", returns)
         object.__setattr__(self, "factor_returns", factor_returns)
+        object.__setattr__(self, "context_features", context_features)
 
         n_periods, n_slots = characteristics.shape[:2]
         if returns is not None and returns.shape != (n_periods, n_slots):
             raise ValueError("returns and characteristics disagree on (T, N)")
         if factor_returns is not None and factor_returns.shape != (n_periods, n_slots):
             raise ValueError("factor_returns and characteristics disagree on (T, N)")
+        if context_features is not None and context_features.shape[0] != n_periods:
+            raise ValueError("context_features and characteristics disagree on T")
         if self.timestamps and len(self.timestamps) != n_periods:
             raise ValueError("timestamps length does not match number of periods")
         if self.asset_ids and len(self.asset_ids) != n_slots:
@@ -175,7 +185,7 @@ class FitSummary:
     train_metrics: dict[str, float] = field(default_factory=dict)
     val_metrics: dict[str, float] = field(default_factory=dict)
     best_epoch: int | None = None
-    history: tuple[dict[str, float], ...] = ()
+    history: tuple[dict[str, float | str], ...] = ()
     notes: tuple[str, ...] = ()
 
 
@@ -256,6 +266,60 @@ class AssetForecastResult:
             raise ValueError("timestamps length does not match T")
         if self.asset_ids and len(self.asset_ids) != n_assets:
             raise ValueError("asset_ids length does not match N")
+
+
+@dataclass(slots=True, frozen=True)
+class AssetWeightsResult:
+    """Cross-sectional asset-weight output indexed by date and asset."""
+
+    weights: Array2D
+    timestamps: tuple[Any, ...] = ()
+    asset_ids: tuple[str, ...] = ()
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        weights = _coerce_float_array(self.weights, ndim=2, name="weights")
+        assert weights is not None
+        object.__setattr__(self, "weights", weights)
+        n_periods, n_assets = weights.shape
+        if self.timestamps and len(self.timestamps) != n_periods:
+            raise ValueError("timestamps length does not match T")
+        if self.asset_ids and len(self.asset_ids) != n_assets:
+            raise ValueError("asset_ids length does not match N")
+
+
+@dataclass(slots=True, frozen=True)
+class SDFState:
+    """Structural state extracted from a stochastic discount factor model."""
+
+    asset_weights: Array2D
+    sdf_values: FloatArray1D | None = None
+    checkpoint_epoch: int | None = None
+    timestamps: tuple[Any, ...] = ()
+    asset_ids: tuple[str, ...] = ()
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        asset_weights = _coerce_float_array(self.asset_weights, ndim=2, name="asset_weights")
+        sdf_values = _coerce_float_array(self.sdf_values, ndim=1, name="sdf_values")
+        assert asset_weights is not None
+        object.__setattr__(self, "asset_weights", asset_weights)
+        object.__setattr__(self, "sdf_values", sdf_values)
+        n_periods, n_assets = asset_weights.shape
+        if sdf_values is not None and sdf_values.shape != (n_periods,):
+            raise ValueError("sdf_values must have shape (T,)")
+        if self.timestamps and len(self.timestamps) != n_periods:
+            raise ValueError("timestamps length does not match T")
+        if self.asset_ids and len(self.asset_ids) != n_assets:
+            raise ValueError("asset_ids length does not match N")
+
+    @property
+    def n_periods(self) -> int:
+        return self.asset_weights.shape[0]
+
+    @property
+    def n_assets(self) -> int:
+        return self.asset_weights.shape[1]
 
 
 @dataclass(slots=True, frozen=True)

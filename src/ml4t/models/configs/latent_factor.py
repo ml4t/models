@@ -68,14 +68,26 @@ class SAEConfig(LatentFactorConfig):
     checkpoint_epochs: tuple[int, ...] = ()
     default_checkpoint: int | None = None
     lr: float = 1e-4
-    checkpoint_interval: int | None = 5
-    checkpoint_epochs: tuple[int, ...] = ()
-    default_checkpoint: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
-class SDFConfig(LatentFactorConfig):
+class SDFConfig(BaseModelConfig):
     """Config for SDF networks."""
 
     model_name: str = "sdf"
     output_mode: str = "weights"
+    state_dim_sdf: int = 4
+    state_dim_moment: int = 32
+    hidden_dim: int = 64
+    n_instruments: int = 8
+    dropout: float = 0.05
+    n_epochs_unc: int = 256
+    n_epochs_moment: int = 64
+    n_epochs_cond: int = 1024
+    checkpoint_interval: int | None = 5
+    checkpoint_epochs: tuple[int, ...] = ()
+    default_checkpoint: int | None = None
+    expected_return_mapper: str = "linear"
+    burn_in_epochs: int = 0
+    lr: float = 1e-3
+    weight_decay: float = 0.0

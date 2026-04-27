@@ -27,7 +27,7 @@ class SAEModel(BaseLatentFactorModel[SAEConfig]):
         self._checkpoint_states: dict[int, list[dict[str, Any]]] = {}
         self._asset_ids: tuple[str, ...] = ()
         self._n_characteristics: int | None = None
-        self._history: tuple[dict[str, float], ...] = ()
+        self._history: tuple[dict[str, float | str], ...] = ()
 
     @property
     def available_checkpoints(self) -> tuple[int, ...]:
@@ -136,13 +136,15 @@ class SAEModel(BaseLatentFactorModel[SAEConfig]):
                     self._checkpoint_states[epoch].append(_cpu_state_dict(model))
                     loss_sums[epoch] += mean_loss
 
-        self._history = tuple(
-            {
-                "epoch": float(epoch),
-                "train_loss": loss_sums[epoch] / self.config.n_ensemble,
-            }
-            for epoch in checkpoint_epochs
-        )
+        history: list[dict[str, float | str]] = []
+        for epoch in checkpoint_epochs:
+            history.append(
+                {
+                    "epoch": float(epoch),
+                    "train_loss": loss_sums[epoch] / self.config.n_ensemble,
+                }
+            )
+        self._history = tuple(history)
         self._asset_ids = cross_section.asset_ids
         self._n_characteristics = cross_section.characteristics.shape[2]
         self._mark_fitted()

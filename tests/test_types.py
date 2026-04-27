@@ -29,3 +29,11 @@ def test_cross_section_batch_validates_factor_return_alignment() -> None:
             characteristics=np.zeros((2, 3, 4), dtype=np.float64),
             factor_returns=np.zeros((3, 3), dtype=np.float64),
         )
+
+
+def test_cross_section_batch_validates_context_alignment() -> None:
+    with pytest.raises(ValueError):
+        CrossSectionBatch(
+            characteristics=np.zeros((2, 3, 4), dtype=np.float64),
+            context_features=np.zeros((3, 2), dtype=np.float64),
+        )

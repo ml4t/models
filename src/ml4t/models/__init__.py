@@ -2,7 +2,13 @@
 
 __version__ = "0.1.0a0"
 
-from ml4t.models.api import AssetMapper, FactorForecaster, LatentFactorModel, PortfolioModel
+from ml4t.models.api import (
+    AssetMapper,
+    FactorForecaster,
+    LatentFactorModel,
+    PortfolioModel,
+    StochasticDiscountFactorModel,
+)
 from ml4t.models.configs import (
     AR1ForecasterConfig,
     CAEConfig,
@@ -23,11 +29,13 @@ from ml4t.models.forecasters import (
     EWMABaseFactorForecaster,
     ExpandingMeanFactorForecaster,
 )
-from ml4t.models.latent_factors import CAEModel, IPCAModel, PCAModel, SAEModel, SDFModel
+from ml4t.models.latent_factors import CAEModel, IPCAModel, PCAModel, SAEModel
 from ml4t.models.mappers import BetaLambdaMapper
 from ml4t.models.pipelines import LatentFactorForecastPipeline
+from ml4t.models.sdf import LinearSDFReturnMapper, SDFModel
 from ml4t.models.types import (
     AssetForecastResult,
+    AssetWeightsResult,
     CrossSectionBatch,
     FactorForecastResult,
     FitSummary,
@@ -36,6 +44,7 @@ from ml4t.models.types import (
     PersistentPanelBatch,
     PortfolioSequenceBatch,
     PortfolioWeightsResult,
+    SDFState,
 )
 
 __all__ = [
@@ -44,6 +53,7 @@ __all__ = [
     "AR1ForecasterConfig",
     "AssetMapper",
     "BetaLambdaMapper",
+    "AssetWeightsResult",
     "CAEConfig",
     "CAEModel",
     "CrossSectionBatch",
@@ -62,6 +72,7 @@ __all__ = [
     "LatentFactorPrediction",
     "LatentFactorState",
     "LSTMPortfolioConfig",
+    "LinearSDFReturnMapper",
     "MapperConfig",
     "PCAConfig",
     "PCAModel",
@@ -75,4 +86,6 @@ __all__ = [
     "SAEModel",
     "SDFConfig",
     "SDFModel",
+    "SDFState",
+    "StochasticDiscountFactorModel",
 ]
