@@ -6,11 +6,13 @@ import numpy as np
 
 from ml4t.models import (
     AssetForecastResult,
+    AssetSignalResult,
     AssetWeightsResult,
     BacktestDataFeedInputs,
     PortfolioWeightsResult,
     backtest_datafeed_inputs,
     backtest_inputs_from_asset_forecast,
+    backtest_inputs_from_asset_signal,
     backtest_inputs_from_weights,
     prediction_surface_from_asset_forecast,
     resolve_feed_spec_mapping,
@@ -134,6 +136,30 @@ def test_backtest_inputs_from_asset_forecast_builds_signal_surface(monkeypatch) 
     kwargs = inputs.to_datafeed_kwargs()
 
     assert kwargs["signals_df"][0]["prediction_value"] == 0.1
+    assert kwargs["feed_spec"]["entity_col"] == "asset"
+
+
+def test_backtest_inputs_from_asset_signal_builds_signal_surface(monkeypatch) -> None:
+    signal = AssetSignalResult(
+        signal_values=np.array([[0.7]], dtype=np.float64),
+        timestamps=("2024-01-01",),
+        asset_ids=("AAPL",),
+    )
+
+    monkeypatch.setattr(
+        "ml4t.models.integration.surfaces.SurfaceFrame.to_polars",
+        lambda self: self.to_dicts(),
+    )
+
+    inputs = backtest_inputs_from_asset_signal(
+        signal,
+        prices_path=Path("/tmp/prices.parquet"),
+        schema={"timestamp_col": "timestamp", "entity_col": "asset"},
+    )
+
+    kwargs = inputs.to_datafeed_kwargs()
+
+    assert kwargs["signals_df"][0]["prediction_value"] == 0.7
     assert kwargs["feed_spec"]["entity_col"] == "asset"
 
 

@@ -6,6 +6,7 @@ from typing import Protocol
 
 from ml4t.models.types import (
     AssetForecastResult,
+    AssetSignalResult,
     CrossSectionBatch,
     FactorForecastResult,
     FitSummary,
@@ -82,6 +83,26 @@ class PortfolioPostprocessor(Protocol):
         batch: PortfolioSequenceBatch,
         weights: PortfolioWeightsResult,
     ) -> PortfolioWeightsResult: ...
+
+
+class AssetPredictionModel(Protocol):
+    """Protocol for direct asset-level predictive models."""
+
+    is_fitted: bool
+
+    def fit(
+        self,
+        batch: CrossSectionBatch,
+        *,
+        validation_batch: CrossSectionBatch | None = None,
+    ) -> FitSummary: ...
+
+    def predict(
+        self,
+        batch: CrossSectionBatch,
+        *,
+        checkpoint: int | None = None,
+    ) -> AssetSignalResult: ...
 
 
 class StochasticDiscountFactorEstimator(Protocol):

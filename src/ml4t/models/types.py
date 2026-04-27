@@ -307,6 +307,30 @@ class AssetForecastResult:
 
 
 @dataclass(slots=True, frozen=True)
+class AssetSignalResult:
+    """Asset-level predictive signals."""
+
+    signal_values: Array2D
+    timestamps: tuple[Any, ...] = ()
+    asset_ids: tuple[str, ...] = ()
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        signal_values = _coerce_float_array(
+            self.signal_values,
+            ndim=2,
+            name="signal_values",
+        )
+        assert signal_values is not None
+        object.__setattr__(self, "signal_values", signal_values)
+        n_periods, n_assets = signal_values.shape
+        if self.timestamps and len(self.timestamps) != n_periods:
+            raise ValueError("timestamps length does not match T")
+        if self.asset_ids and len(self.asset_ids) != n_assets:
+            raise ValueError("asset_ids length does not match N")
+
+
+@dataclass(slots=True, frozen=True)
 class AssetWeightsResult:
     """Cross-sectional asset-weight output indexed by date and asset."""
 

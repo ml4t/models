@@ -9,7 +9,12 @@ from typing import Any
 
 import numpy as np
 
-from ml4t.models.types import AssetForecastResult, AssetWeightsResult, PortfolioWeightsResult
+from ml4t.models.types import (
+    AssetForecastResult,
+    AssetSignalResult,
+    AssetWeightsResult,
+    PortfolioWeightsResult,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,6 +85,40 @@ def prediction_surface_from_asset_forecast(
         columns=("timestamp", "asset", "prediction_value", *constant_columns),
         rows=tuple(rows),
         metadata={"surface_type": "prediction", **forecast.metadata},
+    )
+
+
+def prediction_surface_from_asset_signal(
+    signal: AssetSignalResult,
+    *,
+    constants: dict[str, Any] | None = None,
+) -> SurfaceFrame:
+    """Convert asset-level signals to a diagnostic-ready prediction surface."""
+
+    signal_values = np.asarray(signal.signal_values, dtype=np.float64)
+    timestamps = _resolve_timestamps(signal_values.shape[0], signal.timestamps)
+    assets = _resolve_assets(signal_values.shape[1], signal.asset_ids)
+    constant_columns = tuple((constants or {}).keys())
+    rows: list[tuple[Any, ...]] = []
+
+    for t_idx, timestamp in enumerate(timestamps):
+        for a_idx, asset in enumerate(assets):
+            value = signal_values[t_idx, a_idx]
+            if not np.isfinite(value):
+                continue
+            rows.append(
+                (
+                    timestamp,
+                    asset,
+                    float(value),
+                    *tuple((constants or {}).values()),
+                )
+            )
+
+    return SurfaceFrame(
+        columns=("timestamp", "asset", "prediction_value", *constant_columns),
+        rows=tuple(rows),
+        metadata={"surface_type": "prediction", **signal.metadata},
     )
 
 

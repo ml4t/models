@@ -1,5 +1,6 @@
 """Public config dataclasses."""
 
+from ml4t.models.configs.asset_prediction import AssetPredictionConfig, SAEConfig
 from ml4t.models.configs.base import BaseModelConfig
 from ml4t.models.configs.forecast import (
     AR1ForecasterConfig,
@@ -11,7 +12,7 @@ from ml4t.models.configs.latent_factor import (
     IPCAConfig,
     LatentFactorConfig,
     PCAConfig,
-    SAEConfig,
+    RPPCAConfig,
     StochasticDiscountFactorConfig,
 )
 from ml4t.models.configs.pipeline import MapperConfig, PipelineConfig
@@ -25,6 +26,7 @@ from ml4t.models.configs.portfolio import (
 __all__ = [
     "BaseModelConfig",
     "AR1ForecasterConfig",
+    "AssetPredictionConfig",
     "CAEConfig",
     "DeepPortfolioConfig",
     "EWMABaseForecasterConfig",
@@ -37,6 +39,7 @@ __all__ = [
     "PCAConfig",
     "PipelineConfig",
     "PortfolioConfig",
+    "RPPCAConfig",
     "SAEConfig",
     "StochasticDiscountFactorConfig",
 ]

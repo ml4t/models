@@ -5,10 +5,12 @@ import pytest
 
 from ml4t.models import (
     AssetForecastResult,
+    AssetSignalResult,
     AssetWeightsResult,
     PortfolioWeightsResult,
     context_surface_from_weights,
     prediction_surface_from_asset_forecast,
+    prediction_surface_from_asset_signal,
     signal_surface_from_asset_weights,
     signal_surface_from_portfolio_weights,
     weight_surface_from_asset_weights,
@@ -34,6 +36,21 @@ def test_prediction_surface_uses_diagnostic_column_names() -> None:
     assert surface.metadata["surface_type"] == "prediction"
     assert surface.to_dicts()[0]["asset"] == "AAPL"
     assert surface.to_dicts()[0]["config_name"] == "baseline"
+    assert len(surface.rows) == 3
+
+
+def test_prediction_surface_supports_generic_asset_signals() -> None:
+    signal = AssetSignalResult(
+        signal_values=np.array([[0.4, np.nan], [-0.2, 0.1]], dtype=np.float64),
+        timestamps=("2024-01-01", "2024-01-02"),
+        asset_ids=("AAPL", "MSFT"),
+        metadata={"model_name": "sae"},
+    )
+
+    surface = prediction_surface_from_asset_signal(signal)
+
+    assert surface.columns == ("timestamp", "asset", "prediction_value")
+    assert surface.metadata["model_name"] == "sae"
     assert len(surface.rows) == 3
 
 

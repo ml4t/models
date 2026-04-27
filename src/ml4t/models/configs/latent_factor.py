@@ -25,6 +25,19 @@ class PCAConfig(LatentFactorConfig):
 
 
 @dataclass(frozen=True, slots=True)
+class RPPCAConfig(LatentFactorConfig):
+    """Config for risk-premium-aware PCA."""
+
+    model_name: str = "rp_pca"
+    persistent_entities: bool = True
+    gamma: float = 0.0
+    base_moment: str = "covariance"
+    scale_by_asset_volatility: bool = False
+    normalize_loadings: str = "unit_length"
+    orthogonalize_factors: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class IPCAConfig(LatentFactorConfig):
     """Config for IPCA."""
 
@@ -52,25 +65,6 @@ class CAEConfig(LatentFactorConfig):
 
 
 @dataclass(frozen=True, slots=True)
-class SAEConfig(LatentFactorConfig):
-    """Config for supervised autoencoders."""
-
-    model_name: str = "sae"
-    task_type: str = "regression"
-    hidden_units: tuple[int, ...] | None = None
-    dropout_rates: tuple[float, ...] | None = None
-    noise_std: float = 0.035
-    alpha: float = 1.0
-    aux_weight: float = 1.0
-    n_ensemble: int = 1
-    n_epochs: int = 50
-    checkpoint_interval: int | None = 5
-    checkpoint_epochs: tuple[int, ...] = ()
-    default_checkpoint: int | None = None
-    lr: float = 1e-4
-
-
-@dataclass(frozen=True, slots=True)
 class StochasticDiscountFactorConfig(BaseModelConfig):
     """Config for stochastic discount factor networks."""
 
@@ -88,6 +82,13 @@ class StochasticDiscountFactorConfig(BaseModelConfig):
     checkpoint_epochs: tuple[int, ...] = ()
     default_checkpoint: int | None = None
     expected_return_mapper: str = "linear"
+    beta_state_dim: int = 4
+    beta_hidden_dim: int = 64
+    beta_n_epochs: int = 256
+    beta_checkpoint_interval: int | None = 16
+    beta_checkpoint_epochs: tuple[int, ...] = ()
+    beta_default_checkpoint: int | None = None
+    beta_lr: float = 1e-3
     burn_in_epochs: int = 0
     lr: float = 1e-3
     weight_decay: float = 0.0

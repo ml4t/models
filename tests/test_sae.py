@@ -3,27 +3,24 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from ml4t.models import CrossSectionBatch, SAEConfig, SAEModel
+from ml4t.models import AssetSignalResult, CrossSectionBatch, SAEConfig, SAEModel
 
 pytest.importorskip("torch")
 
 
-def test_sae_tracks_checkpoints_and_extracts_bottleneck_state() -> None:
+def test_sae_predicts_checkpointed_direct_signals() -> None:
     rng = np.random.default_rng(17)
     n_periods = 8
     n_assets = 9
-    n_features = 3
+    n_features = 4
 
     characteristics = rng.normal(size=(n_periods, n_assets, n_features))
-    latent_beta = (
-        0.3
-        + 0.8 * characteristics[..., 0]
-        - 0.5 * characteristics[..., 1]
+    signal = (
+        0.6 * characteristics[..., 0]
+        - 0.3 * characteristics[..., 1]
         + 0.2 * characteristics[..., 2]
     )
-    factor = np.linspace(-0.25, 0.35, num=n_periods, dtype=np.float64)[:, None]
-    returns = latent_beta * factor
-    returns += 0.01 * rng.normal(size=returns.shape)
+    returns = signal + 0.05 * rng.normal(size=signal.shape)
 
     train = CrossSectionBatch(
         characteristics=characteristics,
@@ -37,29 +34,27 @@ def test_sae_tracks_checkpoints_and_extracts_bottleneck_state() -> None:
 
     model = SAEModel(
         SAEConfig(
-            n_factors=1,
-            hidden_units=(1, 8, 8, 8, 8, 8),
+            bottleneck_dim=8,
+            aux_hidden_dim=8,
+            main_hidden_units=(16, 12, 12, 8),
             dropout_rates=(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             n_epochs=10,
             checkpoint_interval=5,
-            n_ensemble=1,
+            batch_size=16,
             lr=1e-3,
         )
     )
-    fit = model.fit(train)
-    train_state = model.extract(train, checkpoint=5)
-    future_state = model.extract(future, checkpoint=10)
+    fit = model.fit(train, validation_batch=train)
+    train_signal = model.predict(train, checkpoint=5)
+    future_signal = model.predict(future, checkpoint=10)
 
     assert fit.converged
     assert model.available_checkpoints == (5, 10)
-    assert fit.best_epoch == 10
-    assert train_state.checkpoint_epoch == 5
-    assert train_state.factor_returns is not None
-    assert train_state.factor_returns.shape == (n_periods, 1)
-    assert train_state.asset_betas.shape == (n_periods, n_assets, 1)
-    assert future_state.checkpoint_epoch == 10
-    assert future_state.factor_returns is None
-    assert future_state.asset_betas.shape == (3, n_assets, 1)
+    assert fit.best_epoch is not None
+    assert isinstance(train_signal, AssetSignalResult)
+    assert train_signal.signal_values.shape == (n_periods, n_assets)
+    assert future_signal.signal_values.shape == (3, n_assets)
+    assert np.isfinite(train_signal.signal_values).any()
 
 
 def test_sae_requires_returns_for_training() -> None:
@@ -70,37 +65,30 @@ def test_sae_requires_returns_for_training() -> None:
         model.fit(batch)
 
 
-def test_sae_prefers_continuous_factor_returns_for_extraction() -> None:
+def test_sae_classification_returns_probabilities() -> None:
     rng = np.random.default_rng(5)
-    n_periods = 6
-    n_assets = 7
-    n_features = 3
-
-    characteristics = rng.normal(size=(n_periods, n_assets, n_features))
-    continuous_returns = rng.normal(size=(n_periods, n_assets))
-    labels = (continuous_returns > 0).astype(np.float64)
+    characteristics = rng.normal(size=(6, 7, 3))
+    raw_scores = characteristics[..., 0] - characteristics[..., 1]
+    labels = (raw_scores > 0.0).astype(np.float64)
 
     batch = CrossSectionBatch(
         characteristics=characteristics,
         returns=labels,
-        factor_returns=continuous_returns,
-        timestamps=tuple(f"2024-{month:02d}" for month in range(1, n_periods + 1)),
+        timestamps=tuple(f"2024-{month:02d}" for month in range(1, 7)),
     )
-
     model = SAEModel(
         SAEConfig(
-            n_factors=1,
-            hidden_units=(1, 8, 8, 8, 8, 8),
+            task_type="classification",
+            bottleneck_dim=6,
+            aux_hidden_dim=6,
+            main_hidden_units=(12, 12, 8, 8),
             dropout_rates=(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             n_epochs=5,
             checkpoint_interval=5,
-            n_ensemble=1,
-            task_type="classification",
         )
     )
     model.fit(batch)
-    state = model.extract(batch, checkpoint=5)
+    signal = model.predict(batch, checkpoint=5)
 
-    assert state.factor_returns is not None
-    assert state.factor_returns.shape == (n_periods, 1)
-    assert np.isfinite(state.factor_returns).any()
+    assert np.nanmin(signal.signal_values) >= 0.0
+    assert np.nanmax(signal.signal_values) <= 1.0

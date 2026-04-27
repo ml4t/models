@@ -4,14 +4,17 @@ __version__ = "0.1.0a0"
 
 from ml4t.models.api import (
     AssetMapper,
+    AssetPredictionModel,
     FactorForecaster,
     LatentFactorModel,
     PortfolioModel,
     PortfolioPostprocessor,
     StochasticDiscountFactorEstimator,
 )
+from ml4t.models.asset_prediction import SAEModel
 from ml4t.models.configs import (
     AR1ForecasterConfig,
+    AssetPredictionConfig,
     CAEConfig,
     DeepPortfolioConfig,
     EWMABaseForecasterConfig,
@@ -24,6 +27,7 @@ from ml4t.models.configs import (
     PCAConfig,
     PipelineConfig,
     PortfolioConfig,
+    RPPCAConfig,
     SAEConfig,
     StochasticDiscountFactorConfig,
 )
@@ -38,11 +42,13 @@ from ml4t.models.integration import (
     SurfaceFrame,
     backtest_datafeed_inputs,
     backtest_inputs_from_asset_forecast,
+    backtest_inputs_from_asset_signal,
     backtest_inputs_from_weights,
     context_surface_from_weights,
     cross_section_batch_from_long_frame,
     persistent_panel_batch_from_long_frame,
     prediction_surface_from_asset_forecast,
+    prediction_surface_from_asset_signal,
     resolve_dataset_schema,
     resolve_feed_spec_mapping,
     signal_surface_from_asset_weights,
@@ -51,7 +57,7 @@ from ml4t.models.integration import (
     weight_surface_from_portfolio_weights,
     write_backtest_surfaces,
 )
-from ml4t.models.latent_factors import CAEModel, IPCAModel, PCAModel, SAEModel
+from ml4t.models.latent_factors import CAEModel, IPCAModel, PCAModel, RPPCAModel
 from ml4t.models.mappers import BetaLambdaMapper
 from ml4t.models.pipelines import (
     LatentFactorForecastPipeline,
@@ -66,10 +72,12 @@ from ml4t.models.portfolio import (
 )
 from ml4t.models.stochastic_discount_factor import (
     LinearStochasticDiscountFactorReturnMapper,
+    StochasticDiscountFactorBetaNetworkHead,
     StochasticDiscountFactorModel,
 )
 from ml4t.models.types import (
     AssetForecastResult,
+    AssetSignalResult,
     AssetWeightsResult,
     CrossSectionBatch,
     FactorForecastResult,
@@ -88,6 +96,9 @@ __all__ = [
     "AR1FactorForecaster",
     "AR1ForecasterConfig",
     "AssetMapper",
+    "AssetPredictionConfig",
+    "AssetPredictionModel",
+    "AssetSignalResult",
     "BetaLambdaMapper",
     "AssetWeightsResult",
     "BacktestDataFeedInputs",
@@ -96,6 +107,7 @@ __all__ = [
     "CrossSectionBatch",
     "backtest_datafeed_inputs",
     "backtest_inputs_from_asset_forecast",
+    "backtest_inputs_from_asset_signal",
     "backtest_inputs_from_weights",
     "context_surface_from_weights",
     "DeepPortfolioConfig",
@@ -135,15 +147,19 @@ __all__ = [
     "SAEConfig",
     "SAEModel",
     "ResolvedDatasetSchema",
+    "RPPCAConfig",
+    "RPPCAModel",
     "SurfaceFrame",
     "cross_section_batch_from_long_frame",
     "persistent_panel_batch_from_long_frame",
     "prediction_surface_from_asset_forecast",
+    "prediction_surface_from_asset_signal",
     "resolve_feed_spec_mapping",
     "resolve_dataset_schema",
     "signal_surface_from_asset_weights",
     "signal_surface_from_portfolio_weights",
     "StochasticDiscountFactorConfig",
+    "StochasticDiscountFactorBetaNetworkHead",
     "StochasticDiscountFactorEstimator",
     "StochasticDiscountFactorModel",
     "StochasticDiscountFactorState",
