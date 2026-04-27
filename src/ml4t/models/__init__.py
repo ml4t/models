@@ -7,6 +7,7 @@ from ml4t.models.api import (
     FactorForecaster,
     LatentFactorModel,
     PortfolioModel,
+    PortfolioPostprocessor,
     StochasticDiscountFactorEstimator,
 )
 from ml4t.models.configs import (
@@ -17,6 +18,7 @@ from ml4t.models.configs import (
     ExpandingMeanForecasterConfig,
     IPCAConfig,
     LatentFactorConfig,
+    LinearPortfolioConfig,
     LSTMPortfolioConfig,
     MapperConfig,
     PCAConfig,
@@ -32,8 +34,17 @@ from ml4t.models.forecasters import (
 )
 from ml4t.models.latent_factors import CAEModel, IPCAModel, PCAModel, SAEModel
 from ml4t.models.mappers import BetaLambdaMapper
-from ml4t.models.pipelines import LatentFactorForecastPipeline
-from ml4t.models.portfolio import DeepPortfolioModel, LSTMPortfolioModel
+from ml4t.models.pipelines import (
+    LatentFactorForecastPipeline,
+    PortfolioAllocationPipeline,
+    PortfolioPipelineFitResult,
+)
+from ml4t.models.portfolio import (
+    DeepPortfolioModel,
+    LinearFeaturePortfolioModel,
+    LSTMPortfolioModel,
+    WeightConstraintPostprocessor,
+)
 from ml4t.models.stochastic_discount_factor import (
     LinearStochasticDiscountFactorReturnMapper,
     StochasticDiscountFactorModel,
@@ -47,6 +58,7 @@ from ml4t.models.types import (
     LatentFactorPrediction,
     LatentFactorState,
     PersistentPanelBatch,
+    PortfolioPrediction,
     PortfolioSequenceBatch,
     PortfolioWeightsResult,
     StochasticDiscountFactorState,
@@ -78,6 +90,8 @@ __all__ = [
     "LatentFactorModel",
     "LatentFactorPrediction",
     "LatentFactorState",
+    "LinearFeaturePortfolioModel",
+    "LinearPortfolioConfig",
     "LSTMPortfolioConfig",
     "LSTMPortfolioModel",
     "LinearStochasticDiscountFactorReturnMapper",
@@ -86,7 +100,11 @@ __all__ = [
     "PCAModel",
     "PersistentPanelBatch",
     "PipelineConfig",
+    "PortfolioAllocationPipeline",
     "PortfolioConfig",
+    "PortfolioPipelineFitResult",
+    "PortfolioPostprocessor",
+    "PortfolioPrediction",
     "PortfolioModel",
     "PortfolioSequenceBatch",
     "PortfolioWeightsResult",
@@ -96,4 +114,5 @@ __all__ = [
     "StochasticDiscountFactorEstimator",
     "StochasticDiscountFactorModel",
     "StochasticDiscountFactorState",
+    "WeightConstraintPostprocessor",
 ]

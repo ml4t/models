@@ -15,7 +15,12 @@ from ml4t.models.configs.latent_factor import (
     StochasticDiscountFactorConfig,
 )
 from ml4t.models.configs.pipeline import MapperConfig, PipelineConfig
-from ml4t.models.configs.portfolio import DeepPortfolioConfig, LSTMPortfolioConfig, PortfolioConfig
+from ml4t.models.configs.portfolio import (
+    DeepPortfolioConfig,
+    LinearPortfolioConfig,
+    LSTMPortfolioConfig,
+    PortfolioConfig,
+)
 
 __all__ = [
     "BaseModelConfig",
@@ -26,6 +31,7 @@ __all__ = [
     "ExpandingMeanForecasterConfig",
     "IPCAConfig",
     "LatentFactorConfig",
+    "LinearPortfolioConfig",
     "LSTMPortfolioConfig",
     "MapperConfig",
     "PCAConfig",

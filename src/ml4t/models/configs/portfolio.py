@@ -52,6 +52,18 @@ class LSTMPortfolioConfig(PortfolioConfig):
 
 
 @dataclass(frozen=True, slots=True)
+class LinearPortfolioConfig(PortfolioConfig):
+    """Config for a pooled linear feature portfolio baseline."""
+
+    model_name: str = "linear_portfolio"
+    ridge_alpha: float = 1e-4
+    fit_intercept: bool = True
+    gross_exposure: float = 1.0
+    net_exposure: float = 0.0
+    max_abs_weight: float | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class DeepPortfolioConfig(PortfolioConfig):
     """Config for DeePM-style end-to-end portfolio learners."""
 

@@ -74,6 +74,16 @@ class PortfolioModel(Protocol):
     ) -> PortfolioWeightsResult: ...
 
 
+class PortfolioPostprocessor(Protocol):
+    """Protocol for portfolio-weight post-processing hooks."""
+
+    def transform(
+        self,
+        batch: PortfolioSequenceBatch,
+        weights: PortfolioWeightsResult,
+    ) -> PortfolioWeightsResult: ...
+
+
 class StochasticDiscountFactorEstimator(Protocol):
     """Protocol for stochastic discount factor models with weight-native outputs."""
 

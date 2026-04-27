@@ -4,8 +4,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ml4t.models.api import AssetMapper, FactorForecaster, LatentFactorModel, PanelBatch
-from ml4t.models.types import FitSummary, LatentFactorPrediction
+from ml4t.models.api import (
+    AssetMapper,
+    FactorForecaster,
+    LatentFactorModel,
+    PanelBatch,
+    PortfolioModel,
+    PortfolioPostprocessor,
+)
+from ml4t.models.types import (
+    FitSummary,
+    LatentFactorPrediction,
+    PortfolioPrediction,
+    PortfolioSequenceBatch,
+)
 
 
 @dataclass(slots=True)
@@ -14,6 +26,13 @@ class PipelineFitResult:
 
     structural_fit: FitSummary
     factor_forecast_fit: FitSummary
+
+
+@dataclass(slots=True)
+class PortfolioPipelineFitResult:
+    """Fit summaries for a portfolio-allocation pipeline."""
+
+    model_fit: FitSummary
 
 
 class LatentFactorForecastPipeline:
@@ -51,4 +70,41 @@ class LatentFactorForecastPipeline:
             state=state,
             factor_forecast=factor_forecast,
             asset_forecast=asset_forecast,
+        )
+
+
+class PortfolioAllocationPipeline:
+    """Compose a portfolio model with optional weight post-processing hooks."""
+
+    def __init__(
+        self,
+        model: PortfolioModel,
+        *,
+        postprocessors: tuple[PortfolioPostprocessor, ...] = (),
+    ) -> None:
+        self.model = model
+        self.postprocessors = postprocessors
+
+    def fit(
+        self,
+        batch: PortfolioSequenceBatch,
+        *,
+        validation_batch: PortfolioSequenceBatch | None = None,
+    ) -> PortfolioPipelineFitResult:
+        model_fit = self.model.fit(batch, validation_batch=validation_batch)
+        return PortfolioPipelineFitResult(model_fit=model_fit)
+
+    def predict(
+        self,
+        batch: PortfolioSequenceBatch,
+        *,
+        checkpoint: int | None = None,
+    ) -> PortfolioPrediction:
+        raw_weights = self.model.predict(batch, checkpoint=checkpoint)
+        processed_weights = raw_weights
+        for postprocessor in self.postprocessors:
+            processed_weights = postprocessor.transform(batch, processed_weights)
+        return PortfolioPrediction(
+            raw_weights=raw_weights,
+            processed_weights=processed_weights,
         )

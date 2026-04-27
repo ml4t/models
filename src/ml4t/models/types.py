@@ -374,6 +374,11 @@ class PortfolioWeightsResult:
         weights = _coerce_float_array(self.weights, ndim=3, name="weights")
         assert weights is not None
         object.__setattr__(self, "weights", weights)
+        _, n_periods, n_assets = weights.shape
+        if self.timestamps and len(self.timestamps) != n_periods:
+            raise ValueError("timestamps length does not match T")
+        if self.asset_ids and len(self.asset_ids) != n_assets:
+            raise ValueError("asset_ids length does not match N")
 
 
 @dataclass(slots=True, frozen=True)
@@ -383,3 +388,11 @@ class LatentFactorPrediction:
     state: LatentFactorState
     factor_forecast: FactorForecastResult
     asset_forecast: AssetForecastResult
+
+
+@dataclass(slots=True, frozen=True)
+class PortfolioPrediction:
+    """Full prediction bundle from a portfolio-allocation pipeline."""
+
+    raw_weights: PortfolioWeightsResult
+    processed_weights: PortfolioWeightsResult
