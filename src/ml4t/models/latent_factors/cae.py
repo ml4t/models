@@ -8,6 +8,8 @@ from typing import Any
 
 import numpy as np
 
+from ml4t.models._internal.latent_factor_utils import select_checkpoint_epoch
+from ml4t.models._internal.torch_runtime import import_torch, resolve_device, seed_torch
 from ml4t.models.api import PanelBatch
 from ml4t.models.configs import CAEConfig
 from ml4t.models.latent_factors.base import BaseLatentFactorModel
@@ -42,10 +44,10 @@ class CAEModel(BaseLatentFactorModel[CAEConfig]):
                 "Classification CAE requires factor_returns for managed-portfolio construction"
             )
 
-        torch = _import_torch()
+        torch = import_torch()
         nn = _import_cae_nn()
         checkpoint_epochs = _resolve_training_checkpoints(self.config)
-        device = _resolve_device(torch, self.config.device)
+        device = resolve_device(torch, self.config.device)
 
         portfolio_returns = _portfolio_returns(cross_section)
         assert portfolio_returns is not None
@@ -76,10 +78,8 @@ class CAEModel(BaseLatentFactorModel[CAEConfig]):
 
         for ensemble_idx in range(self.config.n_ensemble):
             seed = self.config.seed + ensemble_idx
-            torch.manual_seed(seed)
             np.random.seed(seed)
-            if getattr(device, "type", "cpu") == "cuda":
-                torch.cuda.manual_seed_all(seed)
+            seed_torch(torch, seed, device)
 
             model = nn.ConditionalAutoencoder(
                 n_characteristics=cross_section.characteristics.shape[2],
@@ -171,14 +171,14 @@ class CAEModel(BaseLatentFactorModel[CAEConfig]):
                 f"expected {self._n_characteristics}, got {cross_section.characteristics.shape[2]}"
             )
 
-        torch = _import_torch()
+        torch = import_torch()
         nn = _import_cae_nn()
         selected_checkpoint = _select_checkpoint(
             checkpoint=checkpoint,
             configured_default=self.config.default_checkpoint,
             available=self.available_checkpoints,
         )
-        device = _resolve_device(torch, self.config.device)
+        device = resolve_device(torch, self.config.device)
         mask = _resolve_mask(cross_section)
         portfolio_returns = _portfolio_returns(cross_section)
         managed_portfolios = None
@@ -269,17 +269,11 @@ def _select_checkpoint(
     configured_default: int | None,
     available: tuple[int, ...],
 ) -> int:
-    if checkpoint is not None:
-        if checkpoint not in available:
-            raise ValueError(f"checkpoint={checkpoint} is not in available_checkpoints={available}")
-        return checkpoint
-    if configured_default is not None:
-        if configured_default not in available:
-            raise ValueError(
-                f"default_checkpoint={configured_default} is not in available_checkpoints={available}"
-            )
-        return configured_default
-    return available[-1]
+    return select_checkpoint_epoch(
+        checkpoint=checkpoint,
+        configured_default=configured_default,
+        available=available,
+    )
 
 
 def _portfolio_returns(batch: CrossSectionBatch) -> np.ndarray | None:
@@ -357,22 +351,6 @@ def _extract_cae_state(
                 factor_returns[date_idx] = factor_t.detach().cpu().numpy().astype(np.float64)
 
     return asset_betas, factor_returns
-
-
-def _resolve_device(torch: Any, requested: str) -> Any:
-    if requested.startswith("cuda") and torch.cuda.is_available():
-        return torch.device(requested)
-    return torch.device("cpu")
-
-
-def _import_torch() -> Any:
-    try:
-        import torch
-    except ModuleNotFoundError as exc:
-        raise ModuleNotFoundError(
-            "CAEModel requires PyTorch. Install torch to use neural latent-factor models."
-        ) from exc
-    return torch
 
 
 def _import_cae_nn() -> Any:

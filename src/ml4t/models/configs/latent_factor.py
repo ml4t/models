@@ -56,8 +56,18 @@ class SAEConfig(LatentFactorConfig):
     """Config for supervised autoencoders."""
 
     model_name: str = "sae"
-    hidden_units: tuple[int, ...] = (32, 16)
+    task_type: str = "regression"
+    hidden_units: tuple[int, ...] | None = None
+    dropout_rates: tuple[float, ...] | None = None
+    noise_std: float = 0.035
+    alpha: float = 1.0
+    aux_weight: float = 1.0
+    n_ensemble: int = 1
     n_epochs: int = 50
+    checkpoint_interval: int | None = 5
+    checkpoint_epochs: tuple[int, ...] = ()
+    default_checkpoint: int | None = None
+    lr: float = 1e-4
     checkpoint_interval: int | None = 5
     checkpoint_epochs: tuple[int, ...] = ()
     default_checkpoint: int | None = None

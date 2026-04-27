@@ -91,6 +91,26 @@ def resolve_checkpoint_epochs(
     return sorted(set(epochs))
 
 
+def select_checkpoint_epoch(
+    *,
+    checkpoint: int | None,
+    configured_default: int | None,
+    available: tuple[int, ...],
+) -> int:
+    """Select a checkpoint from the available extraction grid."""
+    if checkpoint is not None:
+        if checkpoint not in available:
+            raise ValueError(f"checkpoint={checkpoint} is not in available_checkpoints={available}")
+        return checkpoint
+    if configured_default is not None:
+        if configured_default not in available:
+            raise ValueError(
+                f"default_checkpoint={configured_default} is not in available_checkpoints={available}"
+            )
+        return configured_default
+    return available[-1]
+
+
 def summarize_predictions(
     y_true: np.ndarray,
     y_score: np.ndarray,
