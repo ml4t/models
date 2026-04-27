@@ -3,6 +3,8 @@
 from ml4t.models.integration.backtest import (
     BacktestDataFeedInputs,
     backtest_datafeed_inputs,
+    backtest_inputs_from_asset_forecast,
+    backtest_inputs_from_weights,
     resolve_feed_spec_mapping,
 )
 from ml4t.models.integration.data import (
@@ -13,8 +15,11 @@ from ml4t.models.integration.data import (
 )
 from ml4t.models.integration.surfaces import (
     SurfaceFrame,
+    context_surface_from_weights,
     prediction_surface_from_asset_forecast,
+    signal_surface_from_asset_weights,
     signal_surface_from_portfolio_weights,
+    weight_surface_from_asset_weights,
     weight_surface_from_portfolio_weights,
     write_backtest_surfaces,
 )
@@ -24,12 +29,17 @@ __all__ = [
     "ResolvedDatasetSchema",
     "SurfaceFrame",
     "backtest_datafeed_inputs",
+    "backtest_inputs_from_asset_forecast",
+    "backtest_inputs_from_weights",
+    "context_surface_from_weights",
     "cross_section_batch_from_long_frame",
     "prediction_surface_from_asset_forecast",
     "persistent_panel_batch_from_long_frame",
     "resolve_feed_spec_mapping",
     "resolve_dataset_schema",
+    "signal_surface_from_asset_weights",
     "signal_surface_from_portfolio_weights",
+    "weight_surface_from_asset_weights",
     "weight_surface_from_portfolio_weights",
     "write_backtest_surfaces",
 ]

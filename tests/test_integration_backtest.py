@@ -6,9 +6,12 @@ import numpy as np
 
 from ml4t.models import (
     AssetForecastResult,
+    AssetWeightsResult,
     BacktestDataFeedInputs,
     PortfolioWeightsResult,
     backtest_datafeed_inputs,
+    backtest_inputs_from_asset_forecast,
+    backtest_inputs_from_weights,
     prediction_surface_from_asset_forecast,
     resolve_feed_spec_mapping,
     weight_surface_from_portfolio_weights,
@@ -108,6 +111,62 @@ def test_backtest_datafeed_inputs_supports_prices_path_only() -> None:
     assert kwargs["feed_spec"]["entity_col"] == "symbol"
     assert kwargs["feed_spec"]["close_col"] == "settle"
     assert kwargs["feed_spec"]["price_col"] == "settle"
+
+
+def test_backtest_inputs_from_asset_forecast_builds_signal_surface(monkeypatch) -> None:
+    forecast = AssetForecastResult(
+        expected_returns=np.array([[0.1]], dtype=np.float64),
+        timestamps=("2024-01-01",),
+        asset_ids=("AAPL",),
+    )
+
+    monkeypatch.setattr(
+        "ml4t.models.integration.surfaces.SurfaceFrame.to_polars",
+        lambda self: self.to_dicts(),
+    )
+
+    inputs = backtest_inputs_from_asset_forecast(
+        forecast,
+        prices_path=Path("/tmp/prices.parquet"),
+        schema={"timestamp_col": "timestamp", "entity_col": "asset"},
+    )
+
+    kwargs = inputs.to_datafeed_kwargs()
+
+    assert kwargs["signals_df"][0]["prediction_value"] == 0.1
+    assert kwargs["feed_spec"]["entity_col"] == "asset"
+
+
+def test_backtest_inputs_from_weights_supports_signal_and_context_modes(monkeypatch) -> None:
+    weights = AssetWeightsResult(
+        weights=np.array([[0.4, -0.1]], dtype=np.float64),
+        timestamps=("2024-01-01",),
+        asset_ids=("AAPL", "MSFT"),
+    )
+
+    monkeypatch.setattr(
+        "ml4t.models.integration.surfaces.SurfaceFrame.to_polars",
+        lambda self: self.to_dicts(),
+    )
+
+    signal_inputs = backtest_inputs_from_weights(
+        weights,
+        prices_path=Path("/tmp/prices.parquet"),
+        schema={"timestamp_col": "timestamp", "entity_col": "asset"},
+    )
+    signal_kwargs = signal_inputs.to_datafeed_kwargs()
+    assert signal_kwargs["signals_df"][0]["weight"] == 0.4
+    assert "context_df" not in signal_kwargs
+
+    context_inputs = backtest_inputs_from_weights(
+        weights,
+        prices_path=Path("/tmp/prices.parquet"),
+        schema={"timestamp_col": "timestamp", "entity_col": "asset"},
+        as_context=True,
+    )
+    context_kwargs = context_inputs.to_datafeed_kwargs()
+    assert "signals_df" not in context_kwargs
+    assert context_kwargs["context_df"][0]["w_AAPL"] == 0.4
 
 
 def test_backtest_datafeed_inputs_require_single_price_source() -> None:

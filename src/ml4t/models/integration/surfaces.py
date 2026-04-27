@@ -9,7 +9,7 @@ from typing import Any
 
 import numpy as np
 
-from ml4t.models.types import AssetForecastResult, PortfolioWeightsResult
+from ml4t.models.types import AssetForecastResult, AssetWeightsResult, PortfolioWeightsResult
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,6 +101,24 @@ def signal_surface_from_portfolio_weights(
     )
 
 
+def signal_surface_from_asset_weights(
+    weights: AssetWeightsResult,
+    *,
+    constants: dict[str, Any] | None = None,
+    selected_threshold: float = 1e-9,
+) -> SurfaceFrame:
+    """Convert cross-sectional asset weights to a diagnostic-ready signal surface."""
+
+    return _surface_from_asset_weights(
+        weights,
+        value_column="signal_value",
+        include_selected=True,
+        selected_threshold=selected_threshold,
+        constants=constants,
+        surface_type="signal",
+    )
+
+
 def weight_surface_from_portfolio_weights(
     weights: PortfolioWeightsResult,
     *,
@@ -117,6 +135,51 @@ def weight_surface_from_portfolio_weights(
         constants=constants,
         surface_type="weight",
     )
+
+
+def weight_surface_from_asset_weights(
+    weights: AssetWeightsResult,
+    *,
+    constants: dict[str, Any] | None = None,
+    selected_threshold: float = 1e-9,
+) -> SurfaceFrame:
+    """Convert cross-sectional asset weights to a backtest-ready target-weight surface."""
+
+    return _surface_from_asset_weights(
+        weights,
+        value_column="weight",
+        include_selected=True,
+        selected_threshold=selected_threshold,
+        constants=constants,
+        surface_type="weight",
+    )
+
+
+def context_surface_from_weights(
+    weights: AssetWeightsResult | PortfolioWeightsResult,
+    *,
+    prefix: str = "w_",
+    constants: dict[str, Any] | None = None,
+) -> SurfaceFrame:
+    """Convert asset weights to a wide context frame for backtest strategies."""
+
+    weight_matrix, timestamps, assets = _resolve_weight_matrix(weights)
+    constant_columns = tuple((constants or {}).keys())
+    columns = ("timestamp", *(f"{prefix}{asset}" for asset in assets), *constant_columns)
+    rows: list[tuple[Any, ...]] = []
+
+    for t_idx, timestamp in enumerate(timestamps):
+        values = [
+            float(weight_matrix[t_idx, a_idx]) if np.isfinite(weight_matrix[t_idx, a_idx]) else 0.0
+            for a_idx in range(len(assets))
+        ]
+        rows.append((timestamp, *values, *tuple((constants or {}).values())))
+
+    metadata = {"surface_type": "context", **weights.metadata}
+    if isinstance(weights, PortfolioWeightsResult) and weights.checkpoint_step is not None:
+        metadata["checkpoint_step"] = weights.checkpoint_step
+
+    return SurfaceFrame(columns=columns, rows=tuple(rows), metadata=metadata)
 
 
 def write_backtest_surfaces(
@@ -195,6 +258,66 @@ def _surface_from_portfolio_weights(
         rows=tuple(rows),
         metadata=metadata,
     )
+
+
+def _surface_from_asset_weights(
+    weights: AssetWeightsResult,
+    *,
+    value_column: str,
+    include_selected: bool,
+    selected_threshold: float,
+    constants: dict[str, Any] | None,
+    surface_type: str,
+) -> SurfaceFrame:
+    weight_array = np.asarray(weights.weights, dtype=np.float64)
+    n_periods, n_assets = weight_array.shape
+    timestamps = _resolve_timestamps(n_periods, weights.timestamps)
+    assets = _resolve_assets(n_assets, weights.asset_ids)
+    constant_columns = tuple((constants or {}).keys())
+
+    columns = ["timestamp", "asset", value_column]
+    if include_selected:
+        columns.append("selected")
+    columns.extend(constant_columns)
+
+    rows: list[tuple[Any, ...]] = []
+    for t_idx, timestamp in enumerate(timestamps):
+        for a_idx, asset in enumerate(assets):
+            value = weight_array[t_idx, a_idx]
+            if not np.isfinite(value):
+                continue
+            row: list[Any] = [timestamp, asset, float(value)]
+            if include_selected:
+                row.append(bool(abs(value) > selected_threshold))
+            row.extend((constants or {}).values())
+            rows.append(tuple(row))
+
+    return SurfaceFrame(
+        columns=tuple(columns),
+        rows=tuple(rows),
+        metadata={"surface_type": surface_type, **weights.metadata},
+    )
+
+
+def _resolve_weight_matrix(
+    weights: AssetWeightsResult | PortfolioWeightsResult,
+) -> tuple[ArrayLike2D, tuple[Any, ...], tuple[str, ...]]:
+    if isinstance(weights, AssetWeightsResult):
+        weight_matrix = np.asarray(weights.weights, dtype=np.float64)
+        timestamps = _resolve_timestamps(weight_matrix.shape[0], weights.timestamps)
+        assets = _resolve_assets(weight_matrix.shape[1], weights.asset_ids)
+        return weight_matrix, timestamps, assets
+
+    weight_array = np.asarray(weights.weights, dtype=np.float64)
+    if weight_array.shape[0] != 1:
+        raise ValueError("Wide context export requires a single portfolio-weight batch")
+    weight_matrix = weight_array[0]
+    timestamps = _resolve_timestamps(weight_matrix.shape[0], weights.timestamps)
+    assets = _resolve_assets(weight_matrix.shape[1], weights.asset_ids)
+    return weight_matrix, timestamps, assets
+
+
+ArrayLike2D = np.ndarray
 
 
 def _resolve_timestamps(n_periods: int, timestamps: tuple[Any, ...]) -> tuple[Any, ...]:

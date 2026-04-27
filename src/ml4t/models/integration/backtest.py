@@ -8,7 +8,14 @@ from pathlib import Path
 from typing import Any
 
 from ml4t.models.integration.data import resolve_dataset_schema
-from ml4t.models.integration.surfaces import SurfaceFrame
+from ml4t.models.integration.surfaces import (
+    SurfaceFrame,
+    context_surface_from_weights,
+    prediction_surface_from_asset_forecast,
+    weight_surface_from_asset_weights,
+    weight_surface_from_portfolio_weights,
+)
+from ml4t.models.types import AssetForecastResult, AssetWeightsResult, PortfolioWeightsResult
 
 
 @dataclass(frozen=True, slots=True)
@@ -195,6 +202,129 @@ def backtest_datafeed_inputs(
     )
 
 
+def backtest_inputs_from_asset_forecast(
+    forecast: AssetForecastResult,
+    *,
+    prices_frame: Any | None = None,
+    prices_path: str | Path | None = None,
+    schema: Any | None = None,
+    context: SurfaceFrame | None = None,
+    timestamp_col: str | None = None,
+    entity_col: str | None = None,
+    price_col: str | None = None,
+    open_col: str | None = None,
+    high_col: str | None = None,
+    low_col: str | None = None,
+    close_col: str | None = None,
+    volume_col: str | None = None,
+    bid_col: str | None = None,
+    ask_col: str | None = None,
+    mid_col: str | None = None,
+    bid_size_col: str | None = None,
+    ask_size_col: str | None = None,
+    calendar: str | None = None,
+    timezone: str | None = None,
+    data_frequency: Any | None = None,
+    bar_type: str | None = None,
+    timestamp_semantics: str | None = None,
+    session_start_time: str | None = None,
+    constants: dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> BacktestDataFeedInputs:
+    """Build ``DataFeed`` inputs directly from an asset-forecast result."""
+
+    return backtest_datafeed_inputs(
+        prices_frame=prices_frame,
+        prices_path=prices_path,
+        signals=prediction_surface_from_asset_forecast(forecast, constants=constants),
+        context=context,
+        schema=schema,
+        timestamp_col=timestamp_col,
+        entity_col=entity_col,
+        price_col=price_col,
+        open_col=open_col,
+        high_col=high_col,
+        low_col=low_col,
+        close_col=close_col,
+        volume_col=volume_col,
+        bid_col=bid_col,
+        ask_col=ask_col,
+        mid_col=mid_col,
+        bid_size_col=bid_size_col,
+        ask_size_col=ask_size_col,
+        calendar=calendar,
+        timezone=timezone,
+        data_frequency=data_frequency,
+        bar_type=bar_type,
+        timestamp_semantics=timestamp_semantics,
+        session_start_time=session_start_time,
+        metadata=metadata,
+    )
+
+
+def backtest_inputs_from_weights(
+    weights: AssetWeightsResult | PortfolioWeightsResult,
+    *,
+    prices_frame: Any | None = None,
+    prices_path: str | Path | None = None,
+    schema: Any | None = None,
+    as_context: bool = False,
+    context_prefix: str = "w_",
+    timestamp_col: str | None = None,
+    entity_col: str | None = None,
+    price_col: str | None = None,
+    open_col: str | None = None,
+    high_col: str | None = None,
+    low_col: str | None = None,
+    close_col: str | None = None,
+    volume_col: str | None = None,
+    bid_col: str | None = None,
+    ask_col: str | None = None,
+    mid_col: str | None = None,
+    bid_size_col: str | None = None,
+    ask_size_col: str | None = None,
+    calendar: str | None = None,
+    timezone: str | None = None,
+    data_frequency: Any | None = None,
+    bar_type: str | None = None,
+    timestamp_semantics: str | None = None,
+    session_start_time: str | None = None,
+    constants: dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> BacktestDataFeedInputs:
+    """Build ``DataFeed`` inputs directly from target-weight outputs."""
+
+    signals = None if as_context else _weight_surface(weights, constants=constants)
+    context = context_surface_from_weights(weights, prefix=context_prefix, constants=constants)
+    return backtest_datafeed_inputs(
+        prices_frame=prices_frame,
+        prices_path=prices_path,
+        signals=signals,
+        context=context if as_context else None,
+        schema=schema,
+        timestamp_col=timestamp_col,
+        entity_col=entity_col,
+        price_col=price_col,
+        open_col=open_col,
+        high_col=high_col,
+        low_col=low_col,
+        close_col=close_col,
+        volume_col=volume_col,
+        bid_col=bid_col,
+        ask_col=ask_col,
+        mid_col=mid_col,
+        bid_size_col=bid_size_col,
+        ask_size_col=ask_size_col,
+        calendar=calendar,
+        timezone=timezone,
+        data_frequency=data_frequency,
+        bar_type=bar_type,
+        timestamp_semantics=timestamp_semantics,
+        session_start_time=session_start_time,
+        metadata=metadata,
+    )
+
+
 def _coerce_feed_spec_mapping(schema: Any | None) -> dict[str, Any]:
     feed_spec_cls = _load_feed_spec_class()
     if feed_spec_cls is not None:
@@ -333,3 +463,13 @@ def _normalize_feed_spec_aliases(data: dict[str, Any]) -> dict[str, Any]:
         normalized["data_frequency"] = normalized.pop("frequency")
 
     return normalized
+
+
+def _weight_surface(
+    weights: AssetWeightsResult | PortfolioWeightsResult,
+    *,
+    constants: dict[str, Any] | None,
+) -> SurfaceFrame:
+    if isinstance(weights, AssetWeightsResult):
+        return weight_surface_from_asset_weights(weights, constants=constants)
+    return weight_surface_from_portfolio_weights(weights, constants=constants)
