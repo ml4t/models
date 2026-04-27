@@ -60,6 +60,10 @@ dependencies = [
 deep = [
     "torch>=2.4",
 ]
+integration = [
+    "polars>=1.0.0",
+    "ml4t-specs>=0.1.0b0",
+]
 dev = [
     "pytest>=8.0.0",
     "pytest-cov>=5.0.0",
@@ -74,7 +78,7 @@ docs = [
     "mkdocstrings[python]>=0.24.0",
 ]
 all = [
-    "ml4t-models[deep,dev,docs]",
+    "ml4t-models[deep,dev,docs,integration]",
 ]
 
 [project.urls]

@@ -34,9 +34,14 @@ from ml4t.models.forecasters import (
 )
 from ml4t.models.integration import (
     ResolvedDatasetSchema,
+    SurfaceFrame,
     cross_section_batch_from_long_frame,
     persistent_panel_batch_from_long_frame,
+    prediction_surface_from_asset_forecast,
     resolve_dataset_schema,
+    signal_surface_from_portfolio_weights,
+    weight_surface_from_portfolio_weights,
+    write_backtest_surfaces,
 )
 from ml4t.models.latent_factors import CAEModel, IPCAModel, PCAModel, SAEModel
 from ml4t.models.mappers import BetaLambdaMapper
@@ -117,12 +122,17 @@ __all__ = [
     "SAEConfig",
     "SAEModel",
     "ResolvedDatasetSchema",
+    "SurfaceFrame",
     "cross_section_batch_from_long_frame",
     "persistent_panel_batch_from_long_frame",
+    "prediction_surface_from_asset_forecast",
     "resolve_dataset_schema",
+    "signal_surface_from_portfolio_weights",
     "StochasticDiscountFactorConfig",
     "StochasticDiscountFactorEstimator",
     "StochasticDiscountFactorModel",
     "StochasticDiscountFactorState",
+    "weight_surface_from_portfolio_weights",
     "WeightConstraintPostprocessor",
+    "write_backtest_surfaces",
 ]
