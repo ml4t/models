@@ -12,7 +12,7 @@ Documentation: https://ml4trading.io/docs/models/
 
 This library is one of the ML4T libraries supporting the research and production workflow in *Machine Learning for Trading*.
 
-![ML4T Library Ecosystem](docs/images/ml4t_ecosystem_workflow_models.svg)
+![ML4T Library Ecosystem](docs/images/ml4t_ecosystem_workflow_color.svg)
 
 ## What This Library Does
 
