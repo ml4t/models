@@ -1,0 +1,59 @@
+<svg width="1600" height="980" viewBox="0 0 1600 980" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1600" height="980" fill="#FAFAF9"/>
+
+  <text x="92" y="90" fill="#0A1628" font-family="Inter, Arial, sans-serif" font-size="38" font-weight="700">
+    Training And Checkpoint Protocols
+  </text>
+  <text x="92" y="132" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="500">
+    Different model families train in different ways, but the library keeps reporting checkpoints explicit.
+  </text>
+
+  <rect x="92" y="192" width="448" height="288" rx="26" fill="#F8F8F6" stroke="#CBD5E1" stroke-width="2"/>
+  <rect x="576" y="192" width="448" height="288" rx="26" fill="#F8F8F6" stroke="#CBD5E1" stroke-width="2"/>
+  <rect x="1060" y="192" width="448" height="288" rx="26" fill="#0A1628"/>
+
+  <text x="124" y="236" fill="#0A1628" font-family="Inter, Arial, sans-serif" font-size="26" font-weight="700">Closed-Form / Alternating Estimators</text>
+  <text x="124" y="276" fill="#334155" font-family="Inter, Arial, sans-serif" font-size="18">`PCA`, `RP-PCA`, `IPCA`</text>
+  <text x="124" y="324" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="17">Training protocol:</text>
+  <text x="124" y="354" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="17">• closed-form eigendecomposition or ALS loop</text>
+  <text x="124" y="382" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="17">• no epoch grid exposed to the caller</text>
+  <text x="124" y="428" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="17">Reporting convention:</text>
+  <text x="124" y="458" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="17">• structural state is reported at `epoch = 0`</text>
+
+  <text x="608" y="236" fill="#0A1628" font-family="Inter, Arial, sans-serif" font-size="26" font-weight="700">Checkpointed Neural Estimators</text>
+  <text x="608" y="276" fill="#334155" font-family="Inter, Arial, sans-serif" font-size="18">`CAE`, `SAE`, portfolio learners</text>
+  <text x="608" y="324" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="17">Training protocol:</text>
+  <text x="608" y="354" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="17">• `n_epochs` or `max_iters`</text>
+  <text x="608" y="382" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="17">• `checkpoint_interval` or explicit `checkpoint_epochs`</text>
+  <text x="608" y="410" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="17">• optional `default_checkpoint` for prediction</text>
+  <text x="608" y="456" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="17">Why it matters:</text>
+  <text x="608" y="486" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="17">• evaluate multiple emitted horizons</text>
+
+  <text x="1092" y="236" fill="#F8F8F6" font-family="Inter, Arial, sans-serif" font-size="26" font-weight="700">Phase-Aware SDF Training</text>
+  <text x="1092" y="276" fill="#E8E8E6" font-family="Inter, Arial, sans-serif" font-size="18">`StochasticDiscountFactorModel`</text>
+  <text x="1092" y="324" fill="#F8F8F6" font-family="Inter, Arial, sans-serif" font-size="17">1. unconditional SDF warm-up</text>
+  <text x="1092" y="352" fill="#F8F8F6" font-family="Inter, Arial, sans-serif" font-size="17">2. moment-network adversary</text>
+  <text x="1092" y="380" fill="#F8F8F6" font-family="Inter, Arial, sans-serif" font-size="17">3. conditional SDF refinement</text>
+  <text x="1092" y="426" fill="#E8E8E6" font-family="Inter, Arial, sans-serif" font-size="17">Use sparse explicit checkpoints, not dense epoch sprays.</text>
+  <text x="1092" y="454" fill="#E8E8E6" font-family="Inter, Arial, sans-serif" font-size="17">Beta-head checkpoints are a separate, usually smaller grid.</text>
+
+  <rect x="92" y="540" width="1416" height="156" rx="26" fill="#F8F8F6" stroke="#CBD5E1" stroke-width="2"/>
+  <text x="124" y="584" fill="#0A1628" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="700">Shared Reporting Rule</text>
+  <text x="124" y="624" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="18">
+    The model should emit configured checkpoints; selection and evaluation happen outside the estimator.
+  </text>
+  <text x="124" y="660" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="17">The library exposes checkpoints and metadata.</text>
+  <text x="540" y="660" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="17">`ml4t-diagnostic` decides how to score or compare them.</text>
+  <text x="1060" y="660" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="17">Case studies can report fixed checkpoints fold by fold.</text>
+
+  <rect x="92" y="744" width="1416" height="156" rx="26" fill="#0A1628"/>
+  <text x="124" y="788" fill="#F8F8F6" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="700">Practical Defaults</text>
+  <text x="124" y="828" fill="#E8E8E6" font-family="Inter, Arial, sans-serif" font-size="18">• Short neural runs: use interval checkpoints.</text>
+  <text x="548" y="828" fill="#E8E8E6" font-family="Inter, Arial, sans-serif" font-size="18">• Long phased runs like SDF: use 4–8 explicit structural checkpoints.</text>
+  <text x="124" y="860" fill="#E8E8E6" font-family="Inter, Arial, sans-serif" font-size="18">• Keep prediction-time defaults explicit, never implicit “best epoch” logic inside the model.</text>
+
+  <path d="M316 480V540" stroke="#1A2D4A" stroke-width="3"/>
+  <path d="M800 480V540" stroke="#1A2D4A" stroke-width="3"/>
+  <path d="M1284 480V540" stroke="#1A2D4A" stroke-width="3"/>
+  <path d="M800 696V744" stroke="#1A2D4A" stroke-width="3"/>
+</svg>

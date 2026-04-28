@@ -1,6 +1,7 @@
 # Direct Asset Prediction
 
-This family covers models that predict asset-level signals directly rather than first estimating latent structure.
+This family covers models that predict asset-level signals directly rather than first
+estimating latent structure.
 
 ## SAEModel
 
@@ -12,16 +13,23 @@ It does not mean:
 - unsupervised autoencoder
 - latent-factor model
 
-The current implementation follows the supervised autoencoder pattern used in the Jane Street competition lineage:
+The current implementation follows the supervised autoencoder pattern used in the Jane
+Street competition lineage:
 
 - encoder / bottleneck
 - decoder
 - auxiliary head
 - main predictive head
 
+The key architectural idea is not "autoencoding for its own sake." The bottleneck and
+decoder regularize the representation that the predictive heads use. The reconstruction task
+is there to improve the supervised signal, not to recover a structural latent-factor
+decomposition.
+
 ## Why It Lives Outside Latent Factors
 
-The library originally explored treating `SAE` as another latent-factor model. That turns out to be the wrong abstraction.
+The library originally explored treating `SAE` as another latent-factor model. That turns
+out to be the wrong abstraction.
 
 In the current design:
 
@@ -82,9 +90,10 @@ Use `SAEModel` when you want:
 - a strong tabular deep-learning baseline for cross-sectional signals
 - checkpoint-aware asset-level predictions
 
-Use latent-factor models instead when you want:
+This is the right family when the modeling question is:
 
-- explicit exposures
-- factor returns
-- a structural asset-pricing interpretation
+- "Can I learn a useful cross-sectional signal directly?"
 
+Use latent-factor models instead when the question is:
+
+- "Can I explain returns through exposures to a small latent factor system?"

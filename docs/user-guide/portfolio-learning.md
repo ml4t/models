@@ -2,7 +2,13 @@
 
 Portfolio models in `ml4t-models` learn weights directly.
 
-They do not first estimate expected returns and then call a separate optimizer unless you explicitly build that workflow yourself.
+They do not first estimate expected returns and then call a separate optimizer unless you
+explicitly build that workflow yourself.
+
+This family covers two related ideas:
+
+- differentiable end-to-end portfolio objectives
+- structured deep allocation architectures such as DeePM
 
 ## Family Overview
 
@@ -22,6 +28,9 @@ and implement:
 
 - `fit(batch, validation_batch=None)`
 - `predict(batch, checkpoint=None)`
+
+That contract is intentionally separate from latent-factor prediction contracts. The target
+here is an allocation decision, not an expected-return vector.
 
 ## LinearFeaturePortfolioModel
 
@@ -73,6 +82,13 @@ Current architecture includes:
 
 This is a DeePM-style implementation rather than a generic transformer allocator.
 
+The design borrows from the recent end-to-end portfolio-learning literature:
+
+- sequence modeling for local path dependence
+- attention for long-range or cross-asset interaction
+- direct optimization of a risk-adjusted objective
+- explicit handling of costs and turnover
+
 ## Shared Training Features
 
 Portfolio models support:
@@ -92,6 +108,9 @@ Common config controls include:
 - `checkpoint_steps`
 - `default_checkpoint`
 - `early_stopping_patience`
+
+These are not cosmetic training options. They shape the learned portfolio policy because the
+loss is already an allocation objective with cost terms inside the loop.
 
 ## Pipeline Layer
 
@@ -114,4 +133,5 @@ Current helper:
 
 - `WeightConstraintPostprocessor`
 
-Use it when you want to transform raw learned weights into a stricter target-weights frame before handing them to `ml4t-backtest`.
+Use it when you want to transform raw learned weights into a stricter target-weights frame
+before handing them to `ml4t-backtest`.

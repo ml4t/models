@@ -12,11 +12,25 @@ This keeps three distinct economic objects separate:
 2. ex ante factor-premium forecasts
 3. asset-level expected returns
 
+![Two-Step Latent-Factor Forecasting](../images/figure_14_9_two_step_framework.jpeg)
+
 ## Why The Split Matters
 
-For models like `IPCA` and `CAE`, the in-sample fitted return typically uses realized factor returns. That is useful for reconstruction and attribution, but not directly for trading.
+For models like `IPCA` and `CAE`, the in-sample fitted return uses realized factor returns.
+That is useful for reconstruction and attribution, but not directly for trading.
 
-The implementable forecast replaces realized factor returns with a forecast or estimate of factor premia.
+The implementable forecast replaces realized factor returns with a forecast or estimate of
+factor premia.
+
+This distinction is the whole point of the two-step design:
+
+- the structural model explains realized returns
+- the forecaster produces an ex ante premium estimate
+- the mapper turns today's exposures and that premium estimate into asset-level forecasts
+
+That is the paper-faithful interpretation of
+[IPCA](../reference/academic-references.md#ref-kelly-pruitt-su-2019) and
+[CAE](../reference/academic-references.md#ref-gu-kelly-xiu-2021).
 
 ## Pipeline Class
 
@@ -52,7 +66,7 @@ The extracted state contains:
 - `asset_betas`
 - optional `factor_returns`
 - timestamps and asset IDs
-- metadata such as selected checkpoint
+- metadata such as the selected checkpoint
 
 ### Factor Forecaster
 
@@ -93,6 +107,26 @@ This is the baseline represented by:
 - `ExpandingMeanFactorForecaster`
 - `BetaLambdaMapper`
 
+The point of this baseline is clarity. It makes explicit what is structural estimation and
+what is factor-premium forecasting.
+
+## Beyond The Mean Baseline
+
+The mean-premium forecast is a baseline, not a ceiling. The scalable-CAE literature argues
+that better forecasts of the latent factor series can improve the final asset-level signal.
+
+The library therefore keeps the forecaster modular. You can swap in:
+
+- `AR1FactorForecaster`
+- `EWMABaseFactorForecaster`
+
+without changing the structural estimator.
+
+![Factor Forecaster Menu](../images/figure_14_10_forecaster_catalog.jpeg)
+
+The architectural point is more important than the specific forecaster list: structural
+estimation and factor-premium forecasting are separate layers.
+
 ## Checkpoints
 
 Neural structural models such as `CAEModel` expose configurable checkpoints:
@@ -105,7 +139,8 @@ This lets you:
 
 - extract structural states at multiple training horizons
 - fit and evaluate downstream factor forecasters at those checkpoints
-- choose reporting checkpoints explicitly rather than hard-coding “best epoch” behavior
+- choose reporting checkpoints explicitly rather than hard-coding hidden "best epoch"
+  behavior
 
 ## Diagram
 
@@ -118,7 +153,7 @@ flowchart LR
     C --> F[Asset Mapper]
     E --> F
     F --> G[AssetForecastResult]
-    G --> H[Prediction Surface]
+    G --> H[PredictionsFrame]
     H --> I[ml4t-backtest / ml4t-diagnostic]
 ```
 
@@ -130,5 +165,5 @@ Do not force:
 - portfolio learners
 - direct signal predictors
 
-through this latent-factor composition. Those families solve different problems and have different native outputs.
-
+through this latent-factor composition. Those families solve different problems and have
+different native outputs.

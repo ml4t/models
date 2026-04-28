@@ -2,6 +2,8 @@
 
 `ml4t-models` is the library form of the model families developed manually in the book notebooks.
 
+![From The Factor Zoo To A Library Taxonomy](../images/figure_14_1_factor_zoo_to_discipline.jpeg)
+
 The goal is not to hide the teaching implementation. The goal is to:
 
 - show the architecture and mathematics clearly in the chapter notebooks
@@ -27,6 +29,14 @@ The key conceptual transition from the notebooks to the library is:
   - structural extraction
   - factor forecasting
   - asset mapping
+
+That separation matters most for `IPCAModel` and `CAEModel`. In the teaching notebooks, it
+is helpful to show the full architecture and fitted-return logic step by step. In the
+library, the corresponding production object is the two-step pipeline:
+
+```text
+structural estimator -> factor-premium forecaster -> asset mapper
+```
 
 ### Chapter 17: Portfolio Construction
 
@@ -72,4 +82,3 @@ If you are moving from the book notebooks to the library:
 3. [Stochastic Discount Factor](../user-guide/stochastic-discount-factor.md)
 4. [Portfolio Learning](../user-guide/portfolio-learning.md)
 5. [Integration](../user-guide/integration.md)
-

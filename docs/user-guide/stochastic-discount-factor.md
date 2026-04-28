@@ -1,6 +1,13 @@
 # Stochastic Discount Factor
 
-`StochasticDiscountFactorModel` is a separate model family because the native object is not a latent factor with a premium forecast. The native object is a weight-based pricing kernel proxy.
+`StochasticDiscountFactorModel` is a separate model family because the native object is not
+a latent factor with a premium forecast. The native object is a weight-based pricing-kernel
+proxy.
+
+The implementation follows the phase-aware adversarial design of
+[Chen, Pelger, and Zhu (2021)](../reference/academic-references.md#ref-chen-pelger-zhu-2021):
+learn a pricing kernel that is disciplined by the most informative test-asset moments rather
+than only by reconstruction or covariance fit.
 
 ## What The Model Estimates
 
@@ -22,7 +29,8 @@ Latent-factor models estimate:
 - factor realizations
 - then expected returns through `beta × premium`
 
-The stochastic discount factor family instead estimates a traded pricing object directly. It is closer to:
+The stochastic discount factor family instead estimates a traded pricing object directly. It
+is closer to:
 
 - a weight-learning model
 - a no-arbitrage estimator
@@ -56,13 +64,17 @@ For the beta-head side:
 - `beta_checkpoint_epochs`
 - `beta_default_checkpoint`
 
+![SDF Beta-Network Mapping](../images/figure_14_11_sdf_beta_network.jpeg)
+
 ## Native Output
 
 The native output mode is:
 
 - `weights`
 
-That is enforced by the current model implementation. If you want expected-return-style projections, use an explicit downstream mapper rather than treating expected returns as the primary estimation target.
+That is enforced by the current model implementation. If you want expected-return-style
+projections, use an explicit downstream mapper rather than treating expected returns as the
+primary estimation target.
 
 ## Optional Return Mapping
 
@@ -71,7 +83,13 @@ Current helpers include:
 - `LinearStochasticDiscountFactorReturnMapper`
 - `StochasticDiscountFactorBetaNetworkHead`
 
-These are downstream transformations. They do not change the fact that the core estimator is weight-native.
+These are downstream transformations. They do not change the fact that the core estimator is
+weight-native.
+
+The beta-network head is useful when you need an expected-return-like object for comparison
+with latent-factor studies, ranking experiments, or downstream backtests that expect asset
+predictions. It should still be documented as a secondary mapping, not as the primary SDF
+target.
 
 ## Typical Workflow
 
@@ -104,7 +122,9 @@ Use the extracted asset weights as a cross-sectional allocation signal, subject 
 
 ### 2. Use A Beta-Or Return-Projection Head
 
-If you need asset-level expected-return-like quantities for a downstream ranking or comparison study, use an explicit projection helper and document that it is a secondary object.
+If you need asset-level expected-return-like quantities for a downstream ranking or
+comparison study, use an explicit projection helper and document that it is a secondary
+object.
 
 ## Checkpoints
 
@@ -120,3 +140,5 @@ That keeps:
 - beta-head retraining manageable
 - model provenance easier to interpret
 
+For that reason, the recommended default is sparse explicit `checkpoint_epochs`, not dense
+interval checkpointing.

@@ -1,13 +1,21 @@
 # User Guide
 
-`ml4t-models` is organized around model semantics, not around a generic trainer abstraction.
+`ml4t-models` is organized around model semantics, not around one generic trainer
+abstraction.
 
-That means the fastest way to understand the library is to ask four questions:
+The fastest way to understand the library is to ask four questions:
 
 1. what data contract does the model require?
 2. what object does it estimate?
 3. what is the native output?
 4. what still has to happen before you can trade or backtest it?
+
+![Model Families](../images/ml4t_model_family_map.svg)
+
+The core design choice is simple: do not force structurally different finance models through
+one artificial `fit/predict` story. A latent-factor model, a stochastic discount factor
+model, a direct supervised predictor, and an end-to-end portfolio learner may all use neural
+networks, but they are not estimating the same object.
 
 ## The Four Main Workflows
 
@@ -43,7 +51,8 @@ Workflow:
 cross-section batch -> phase-aware no-arbitrage training -> asset weights + SDF series
 ```
 
-This family is intentionally separate because the native object is a traded pricing kernel proxy, not a latent factor plus a premium forecast.
+This family is intentionally separate because the native object is a traded pricing-kernel
+proxy, not a latent factor plus a premium forecast.
 
 ### 3. Direct Asset Prediction
 
@@ -54,7 +63,7 @@ Used by:
 Workflow:
 
 ```text
-cross-section batch -> checkpointed predictor -> asset signals
+cross-section batch -> supervised autoencoder -> asset signals
 ```
 
 This is where the library puts supervised models that predict asset-level signals directly.
@@ -83,13 +92,27 @@ These models optimize allocation decisions directly rather than first estimating
 - Evaluation belongs in `ml4t-diagnostic`, not in this library.
 - Execution belongs in `ml4t-backtest`, not in this library.
 
+## A Good Reading Strategy
+
+If you want the economic logic first:
+
+1. [Latent-Factor Pipelines](latent-factor-pipelines.md)
+2. [Stochastic Discount Factor](stochastic-discount-factor.md)
+3. [Portfolio Learning](portfolio-learning.md)
+
+If you want to wire the library into a workflow quickly:
+
+1. [Data Contracts](data-contracts.md)
+2. [Training Procedures](training-procedures.md)
+3. [Integration](integration.md)
+
 ## Reading Order
 
 - [Data Contracts](data-contracts.md)
+- [Training Procedures](training-procedures.md)
 - [Latent-Factor Pipelines](latent-factor-pipelines.md)
 - [Latent-Factor Models](latent-factor-models.md)
 - [Stochastic Discount Factor](stochastic-discount-factor.md)
 - [Direct Asset Prediction](direct-asset-prediction.md)
 - [Portfolio Learning](portfolio-learning.md)
 - [Integration](integration.md)
-

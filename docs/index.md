@@ -48,7 +48,7 @@ If you are new to the library, start with the [Quickstart](getting-started/quick
 
 ## Architecture At A Glance
 
-![ml4t-models Architecture](images/ml4t_models_architecture.svg)
+![Model Family Map](images/ml4t_model_family_map.svg)
 
 ## Why This Library Exists
 
@@ -128,6 +128,7 @@ portfolio
 - [Installation](getting-started/installation.md)
 - [Quickstart](getting-started/quickstart.md)
 - [Data Contracts](user-guide/data-contracts.md)
+- [Training Procedures](user-guide/training-procedures.md)
 - [Latent-Factor Models](user-guide/latent-factor-models.md)
 - [Architecture](reference/architecture.md)
 - [API Reference](api/index.md)

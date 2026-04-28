@@ -1,0 +1,60 @@
+<svg width="1600" height="980" viewBox="0 0 1600 980" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1600" height="980" fill="#FAFAF9"/>
+
+  <text x="96" y="92" fill="#0A1628" font-family="Inter, Arial, sans-serif" font-size="38" font-weight="700">
+    Model Families And Native Outputs
+  </text>
+  <text x="96" y="132" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="500">
+    The library is organized by finance-native estimation targets, not by one generic deep-learning trainer.
+  </text>
+
+  <rect x="96" y="190" width="660" height="260" rx="28" fill="#F8F8F6" stroke="#CBD5E1" stroke-width="2"/>
+  <rect x="840" y="190" width="300" height="260" rx="28" fill="#0A1628"/>
+  <rect x="1188" y="190" width="316" height="260" rx="28" fill="#F8F8F6" stroke="#CBD5E1" stroke-width="2"/>
+
+  <text x="128" y="234" fill="#0A1628" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="700">Latent Factors</text>
+  <text x="128" y="272" fill="#334155" font-family="Inter, Arial, sans-serif" font-size="18">`PCA`, `RP-PCA`, `IPCA`, `CAE`</text>
+  <text x="128" y="320" fill="#0A1628" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">Input contracts</text>
+  <text x="128" y="350" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="17">• `PersistentPanelBatch` for `PCA` and `RP-PCA`</text>
+  <text x="128" y="378" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="17">• `CrossSectionBatch` for `IPCA` and `CAE`</text>
+  <text x="128" y="414" fill="#0A1628" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">Native outputs</text>
+  <text x="128" y="444" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="17">Conditional or static betas, factor history, structural state</text>
+
+  <text x="872" y="234" fill="#F8F8F6" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="700">Shared</text>
+  <text x="872" y="280" fill="#E8E8E6" font-family="Inter, Arial, sans-serif" font-size="18">Forecasters and mappers stay separate</text>
+  <text x="872" y="334" fill="#F8F8F6" font-family="Inter, Arial, sans-serif" font-size="17">1. Structural extraction</text>
+  <text x="872" y="364" fill="#F8F8F6" font-family="Inter, Arial, sans-serif" font-size="17">2. Factor-premium forecast</text>
+  <text x="872" y="394" fill="#F8F8F6" font-family="Inter, Arial, sans-serif" font-size="17">3. Asset-level mapping</text>
+
+  <text x="1220" y="234" fill="#0A1628" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="700">Result</text>
+  <text x="1220" y="280" fill="#334155" font-family="Inter, Arial, sans-serif" font-size="18">Expected-return forecasts are produced only</text>
+  <text x="1220" y="308" fill="#334155" font-family="Inter, Arial, sans-serif" font-size="18">after a premium forecast and mapper.</text>
+  <text x="1220" y="360" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="17">Typical path:</text>
+  <text x="1220" y="390" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="17">`LatentFactorState → FactorForecastResult → AssetForecastResult`</text>
+
+  <rect x="96" y="498" width="660" height="182" rx="28" fill="#F8F8F6" stroke="#CBD5E1" stroke-width="2"/>
+  <rect x="840" y="498" width="664" height="182" rx="28" fill="#F8F8F6" stroke="#CBD5E1" stroke-width="2"/>
+
+  <text x="128" y="542" fill="#0A1628" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="700">Stochastic Discount Factor</text>
+  <text x="128" y="580" fill="#334155" font-family="Inter, Arial, sans-serif" font-size="18">`StochasticDiscountFactorModel`</text>
+  <text x="128" y="624" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="17">Native object: weight-based pricing kernel proxy</text>
+  <text x="128" y="652" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="17">Outputs: `asset_weights`, `sdf_values`, phased checkpoints</text>
+
+  <text x="872" y="542" fill="#0A1628" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="700">Direct Prediction And Portfolio Learning</text>
+  <text x="872" y="580" fill="#334155" font-family="Inter, Arial, sans-serif" font-size="18">`SAEModel`, `LinearFeaturePortfolioModel`, `LSTMPortfolioModel`, `DeepPortfolioModel`</text>
+  <text x="872" y="624" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="17">`SAEModel` outputs cross-sectional signals directly.</text>
+  <text x="872" y="652" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="17">Portfolio models output target weights directly under cost-aware objectives.</text>
+
+  <rect x="96" y="732" width="1408" height="156" rx="28" fill="#0A1628"/>
+  <text x="128" y="776" fill="#F8F8F6" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="700">Downstream Hand-Off</text>
+  <text x="128" y="816" fill="#E8E8E6" font-family="Inter, Arial, sans-serif" font-size="18">All families eventually hand off tabular results, but they do not all estimate the same thing.</text>
+  <text x="128" y="852" fill="#F8F8F6" font-family="Inter, Arial, sans-serif" font-size="17">• `PredictionsFrame` for asset forecasts or direct signals</text>
+  <text x="128" y="880" fill="#F8F8F6" font-family="Inter, Arial, sans-serif" font-size="17">• `WeightsFrame` and `ContextFrame` for backtests and portfolio diagnostics</text>
+
+  <path d="M756 320H840" stroke="#1A2D4A" stroke-width="3"/>
+  <path d="M1140 320H1188" stroke="#1A2D4A" stroke-width="3"/>
+  <path d="M426 450V498" stroke="#1A2D4A" stroke-width="3"/>
+  <path d="M1172 450V498" stroke="#1A2D4A" stroke-width="3"/>
+  <path d="M426 680V732" stroke="#1A2D4A" stroke-width="3"/>
+  <path d="M1172 680V732" stroke="#1A2D4A" stroke-width="3"/>
+</svg>

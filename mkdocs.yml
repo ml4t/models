@@ -101,6 +101,7 @@ nav:
   - User Guide:
     - user-guide/index.md
     - Data Contracts: user-guide/data-contracts.md
+    - Training Procedures: user-guide/training-procedures.md
     - Latent-Factor Pipelines: user-guide/latent-factor-pipelines.md
     - Latent-Factor Models: user-guide/latent-factor-models.md
     - Stochastic Discount Factor: user-guide/stochastic-discount-factor.md
@@ -128,4 +129,3 @@ extra:
   generator: false
 
 copyright: Copyright &copy; 2024-2026 Stefan Jansen
-

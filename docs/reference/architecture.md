@@ -4,7 +4,7 @@ The library is organized around finance-native model families and contracts.
 
 ## Top-Level Design
 
-![ml4t-models Architecture](../images/ml4t_models_architecture.svg)
+![Model Family Map](../images/ml4t_model_family_map.svg)
 
 ## Why The Families Are Separate
 
@@ -39,6 +39,10 @@ This family learns allocations directly:
 - cost-aware or risk-aware objectives
 - target-weight outputs
 
+## Training Protocol Map
+
+![Training Protocol Map](../images/ml4t_training_protocols.svg)
+
 ## Latent-Factor Pipeline Diagram
 
 ```mermaid
@@ -50,7 +54,7 @@ flowchart LR
     C --> F[Asset Mapper]
     E --> F
     F --> G[AssetForecastResult]
-    G --> H[Prediction Surface]
+    G --> H[PredictionsFrame]
     H --> I[Backtest / Diagnostic]
 ```
 
@@ -62,7 +66,7 @@ flowchart LR
     B --> C[Moment Network Phase]
     C --> D[Conditional SDF Phase]
     D --> E[StochasticDiscountFactorState]
-    E --> F[Weight Surface]
+    E --> F[WeightsFrame]
     E --> G[Optional Return Projection]
 ```
 
@@ -73,7 +77,7 @@ flowchart LR
     A[PortfolioSequenceBatch] --> B[Portfolio Model]
     B --> C[PortfolioWeightsResult]
     C --> D[Postprocessor]
-    D --> E[Target Weight Surface]
+    D --> E[WeightsFrame]
     E --> F[ml4t-backtest]
 ```
 
@@ -101,7 +105,7 @@ ml4t.models
 - model estimation
 - batch and result contracts
 - checkpoint handling
-- frame emission
+- results-frame emission
 
 ### Belongs Elsewhere
 
