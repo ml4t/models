@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from importlib import import_module
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any
 
 import numpy as np
 
@@ -72,9 +72,6 @@ class WeightsFrame(ResultsFrame):
 @dataclass(frozen=True, slots=True)
 class ContextFrame(ResultsFrame):
     """Wide context features for backtest handoff."""
-
-
-FrameT = TypeVar("FrameT", SignalsFrame, WeightsFrame)
 
 
 def predictions_frame_from_asset_forecast(
@@ -273,7 +270,7 @@ def write_backtest_frames(
     return written
 
 
-def _frame_from_portfolio_weights(
+def _frame_from_portfolio_weights[FrameT: SignalsFrame | WeightsFrame](
     weights: PortfolioWeightsResult,
     *,
     value_column: str,
@@ -327,7 +324,7 @@ def _frame_from_portfolio_weights(
     )
 
 
-def _frame_from_asset_weights(
+def _frame_from_asset_weights[FrameT: SignalsFrame | WeightsFrame](
     weights: AssetWeightsResult,
     *,
     value_column: str,
