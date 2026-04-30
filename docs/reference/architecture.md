@@ -98,6 +98,16 @@ ml4t.models
 └── integration/
 ```
 
+## Neural backends and devices
+
+`torch`-based models resolve `device` from config via `ml4t.models._internal.torch_runtime.resolve_device`:
+
+- **`cpu`** — default.
+- **`cuda`** / **`cuda:N`** — when CUDA is available.
+- **`mps`** — when the PyTorch MPS backend is available (typical on Apple Silicon); otherwise CPU.
+
+Unavailable accelerators fall back to CPU so jobs stay runnable in CI or CPU-only environments.
+
 ## Boundary Rules
 
 ### Belongs Here

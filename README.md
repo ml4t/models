@@ -62,6 +62,16 @@ pip install ml4t-models[docs]         # mkdocs site build
 pip install ml4t-models[all]
 ```
 
+### Neural compute devices
+
+Torch-backed configs inherit `device` from `BaseModelConfig` (defaults to `cpu`). Supported values are:
+
+- **`cpu`** — always available.
+- **`cuda`** / **`cuda:N`** — used when `torch.cuda.is_available()`; otherwise training falls back to CPU.
+- **`mps`** — Apple Silicon GPU when `torch.backends.mps.is_available()`; otherwise CPU.
+
+Set `device="mps"` or `device="cuda:0"` on the relevant `*Config` (for example `LSTMPortfolioConfig`, `CAEConfig`, `StochasticDiscountFactorConfig`).
+
 ## Quick Start
 
 ### 1. Latent-Factor Forecast Pipeline
@@ -157,12 +167,12 @@ write_backtest_frames("artifacts/run_001", predictions=frame)
 
 These models estimate a structural representation first, then let a separate forecaster produce ex ante factor premia.
 
-| Model | Contract | Native output | Predictive step |
-|---|---|---|---|
-| `PCAModel` | `PersistentPanelBatch` | static loadings, factor returns | factor-premium forecaster + mapper |
-| `RPPCAModel` | `PersistentPanelBatch` | risk-premium-aware latent factors | factor-premium forecaster + mapper |
-| `IPCAModel` | `CrossSectionBatch` | characteristic-implied betas, factor history | factor-premium forecaster + mapper |
-| `CAEModel` | `CrossSectionBatch` | nonlinear characteristic betas, factor history | factor-premium forecaster + mapper |
+| Model        | Contract               | Native output                                  | Predictive step                    |
+| ------------ | ---------------------- | ---------------------------------------------- | ---------------------------------- |
+| `PCAModel`   | `PersistentPanelBatch` | static loadings, factor returns                | factor-premium forecaster + mapper |
+| `RPPCAModel` | `PersistentPanelBatch` | risk-premium-aware latent factors              | factor-premium forecaster + mapper |
+| `IPCAModel`  | `CrossSectionBatch`    | characteristic-implied betas, factor history   | factor-premium forecaster + mapper |
+| `CAEModel`   | `CrossSectionBatch`    | nonlinear characteristic betas, factor history | factor-premium forecaster + mapper |
 
 ### Stochastic Discount Factor
 

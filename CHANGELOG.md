@@ -2,6 +2,11 @@
 
 All notable changes to `ml4t-models` will be documented in this file.
 
+## Unreleased
+
+- Neural configs: `device="mps"` is supported on Apple Silicon when PyTorch MPS is available
+  (with CPU fallback), alongside existing `cpu` / `cuda` handling in `resolve_device`.
+
 ## 0.1.0a0
 
 - Added finance-native data contracts for persistent panels, ragged cross-sections, and

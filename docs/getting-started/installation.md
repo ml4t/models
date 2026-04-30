@@ -31,6 +31,18 @@ This extra is required for:
 - `LSTMPortfolioModel`
 - `DeepPortfolioModel`
 
+#### Compute device
+
+Neural model configs include a `device` string (default `cpu`):
+
+| Value               | Behavior                                                               |
+| ------------------- | ---------------------------------------------------------------------- |
+| `cpu`               | CPU tensors.                                                           |
+| `cuda`, `cuda:0`, … | GPU when CUDA is available; otherwise CPU.                             |
+| `mps`               | Apple Metal (MPS) when available in your PyTorch build; otherwise CPU. |
+
+Example: `LSTMPortfolioConfig(..., device="mps")` on Apple Silicon with a suitable `torch` install.
+
 ### Cross-Library Integration
 
 Install tabular and spec helpers:
