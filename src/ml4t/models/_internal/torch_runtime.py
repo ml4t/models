@@ -16,12 +16,25 @@ def import_torch() -> Any:
 
 
 def resolve_device(torch: Any, requested: str) -> Any:
-    if requested.startswith("cuda") and torch.cuda.is_available():
-        return torch.device(requested)
+    """Map a config device string to a ``torch.device``, with CUDA/MPS fallbacks to CPU."""
+    raw = requested.strip()
+    lower = raw.lower()
+    if lower.startswith("cuda") and torch.cuda.is_available():
+        return torch.device(raw)
+    mps_backend = getattr(torch.backends, "mps", None)
+    if lower == "mps" or lower.startswith("mps:"):
+        if mps_backend is not None and mps_backend.is_available():
+            return torch.device("mps")
+        return torch.device("cpu")
     return torch.device("cpu")
 
 
 def seed_torch(torch: Any, seed: int, device: Any) -> None:
     torch.manual_seed(seed)
-    if getattr(device, "type", "cpu") == "cuda":
+    dev_type = getattr(device, "type", "cpu")
+    if dev_type == "cuda":
         torch.cuda.manual_seed_all(seed)
+    elif dev_type == "mps":
+        mps_manual_seed = getattr(getattr(torch, "mps", None), "manual_seed", None)
+        if callable(mps_manual_seed):
+            mps_manual_seed(seed)
