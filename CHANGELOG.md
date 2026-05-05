@@ -2,6 +2,11 @@
 
 All notable changes to `ml4t-models` will be documented in this file.
 
+## 0.1.0a1
+
+- Declared Python 3.14 support in package metadata.
+- Extended the CI test matrix to cover Python 3.14.
+
 ## 0.1.0a0
 
 - Added finance-native data contracts for persistent panels, ragged cross-sections, and
