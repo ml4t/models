@@ -28,6 +28,14 @@ class IPCAModel(BaseLatentFactorModel[IPCAConfig]):
             raise RuntimeError("IPCA model must be fitted before gamma is available")
         return self._gamma
 
+    @property
+    def train_factor_returns(self) -> np.ndarray:
+        if self._train_factor_returns is None:
+            raise RuntimeError(
+                "IPCA model must be fitted before train_factor_returns is available"
+            )
+        return self._train_factor_returns
+
     def fit(self, batch: PanelBatch) -> FitSummary:
         cross_section = _require_cross_section(batch)
         if cross_section.returns is None:
@@ -102,6 +110,25 @@ class IPCAModel(BaseLatentFactorModel[IPCAConfig]):
                 break
         else:
             self._fit_iterations = self.config.max_iter
+
+        # Recompute factor history under the final gamma so (gamma,
+        # factor_history) are mutually consistent regardless of convergence
+        # branch. At convergence this is a no-op within tol; at non-convergence
+        # it removes the half-step mismatch otherwise present (KPS §3.1).
+        for date_idx, (design_t, target_t) in enumerate(
+            zip(train_designs, train_targets, strict=True)
+        ):
+            betas_t = design_t @ gamma
+            gram = betas_t.T @ betas_t + self.config.factor_ridge * np.eye(
+                self.config.n_factors,
+                dtype=np.float64,
+            )
+            rhs = betas_t.T @ target_t
+            factor_history[date_idx] = _solve_linear_system(gram, rhs)
+
+        # Apply KPS appendix C.4 ΘY identification: Γ'Γ = I_K and
+        # (1/T) Σ_t f_t f_t' diagonal with descending entries.
+        gamma, factor_history = _normalize_theta_y(gamma, factor_history)
 
         self._gamma = gamma
         self._train_factor_returns = factor_history
@@ -313,3 +340,59 @@ def _solve_linear_system(lhs: np.ndarray, rhs: np.ndarray) -> np.ndarray:
         return np.linalg.solve(lhs, rhs)
     except np.linalg.LinAlgError:
         return np.linalg.lstsq(lhs, rhs, rcond=None)[0]
+
+
+def _normalize_theta_y(
+    gamma: np.ndarray, factor_history: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """Rotate `(gamma, factor_history)` into the KPS ΘY identification set.
+
+    Implements the construction in KPS (2020) appendix C.4: rotate so that
+    `Γ' Γ = I_K` (orthonormal loadings) and `(1/T) Σ_t f_t f_t'` is diagonal
+    with descending non-negative entries. The rotation is exact:
+    `Γ_new · f_new[t] = Γ · f[t]` for every t, so predictions / fit residuals
+    are unchanged.
+    """
+    n_factors = gamma.shape[1]
+    if factor_history.shape[1] != n_factors:
+        raise ValueError(
+            "gamma and factor_history must share the second dimension; got "
+            f"gamma={gamma.shape}, factor_history={factor_history.shape}"
+        )
+
+    # Step 1: Cholesky orthonormalization of Γ.
+    gram_gamma = gamma.T @ gamma
+    try:
+        chol = np.linalg.cholesky(gram_gamma)
+    except np.linalg.LinAlgError:
+        # Defensive: rank-deficient Γ. Fall back to symmetric eigendecomp,
+        # which yields the same Γ_new'Γ_new = I_K guarantee on the active
+        # subspace. Should be unreachable on well-posed inputs.
+        eigvals, eigvecs = np.linalg.eigh(gram_gamma)
+        eigvals = np.clip(eigvals, a_min=0.0, a_max=None)
+        chol = eigvecs @ np.diag(np.sqrt(eigvals)) @ eigvecs.T
+
+    chol_inv = np.linalg.inv(chol)  # K × K, lower triangular inverse
+    gamma_orthonormal = gamma @ chol_inv.T            # (L, K), Γ'Γ = I_K
+    # In column form `f_new = L^T f`; in row form (factor_history shape (T, K))
+    # this becomes `f_new = factor_history @ L = factor_history @ chol`.
+    f_intermediate = factor_history @ chol            # preserves Γ · f product
+
+    # Step 2: eigendecomp of factor covariance, descending eigenvalues.
+    f_cov = (f_intermediate.T @ f_intermediate) / factor_history.shape[0]
+    eigvals, eigvecs = np.linalg.eigh(f_cov)
+    order = np.argsort(eigvals)[::-1]
+    rotation = eigvecs[:, order]                      # orthonormal K × K
+
+    # Step 3: deterministic sign convention. Eigenvectors are unique only up
+    # to ±. Pin signs so each column of Γ has a non-negative max-magnitude
+    # entry, making results reproducible across runs.
+    gamma_final = gamma_orthonormal @ rotation
+    f_final = f_intermediate @ rotation
+    for k in range(n_factors):
+        argmax = int(np.argmax(np.abs(gamma_final[:, k])))
+        if gamma_final[argmax, k] < 0:
+            gamma_final[:, k] *= -1.0
+            f_final[:, k] *= -1.0
+
+    return gamma_final, f_final
