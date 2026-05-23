@@ -2,6 +2,14 @@
 
 All notable changes to `ml4t-models` will be documented in this file.
 
+## 0.1.0a4
+
+- Aligned conditional autoencoder training with shuffled mini-batches, BatchNorm hidden layers,
+  validation-best checkpoints, and per-member extraction.
+- Aligned stochastic discount factor checkpoints with phase-local training, validation-best
+  tracking, and legacy checkpoint-label compatibility.
+- Kept IPCA factor extraction consistent with the final normalized loading matrix.
+
 ## 0.1.0a1
 
 - Declared Python 3.14 support in package metadata.
