@@ -31,9 +31,7 @@ class IPCAModel(BaseLatentFactorModel[IPCAConfig]):
     @property
     def train_factor_returns(self) -> np.ndarray:
         if self._train_factor_returns is None:
-            raise RuntimeError(
-                "IPCA model must be fitted before train_factor_returns is available"
-            )
+            raise RuntimeError("IPCA model must be fitted before train_factor_returns is available")
         return self._train_factor_returns
 
     def fit(self, batch: PanelBatch) -> FitSummary:
@@ -111,10 +109,8 @@ class IPCAModel(BaseLatentFactorModel[IPCAConfig]):
         else:
             self._fit_iterations = self.config.max_iter
 
-        # Recompute factor history under the final gamma so (gamma,
-        # factor_history) are mutually consistent regardless of convergence
-        # branch. At convergence this is a no-op within tol; at non-convergence
-        # it removes the half-step mismatch otherwise present (KPS §3.1).
+        # Recompute factor history under the final gamma before applying
+        # KPS ΘY normalization.
         for date_idx, (design_t, target_t) in enumerate(
             zip(train_designs, train_targets, strict=True)
         ):
@@ -373,16 +369,16 @@ def _normalize_theta_y(
         chol = eigvecs @ np.diag(np.sqrt(eigvals)) @ eigvecs.T
 
     chol_inv = np.linalg.inv(chol)  # K × K, lower triangular inverse
-    gamma_orthonormal = gamma @ chol_inv.T            # (L, K), Γ'Γ = I_K
+    gamma_orthonormal = gamma @ chol_inv.T  # (L, K), Γ'Γ = I_K
     # In column form `f_new = L^T f`; in row form (factor_history shape (T, K))
     # this becomes `f_new = factor_history @ L = factor_history @ chol`.
-    f_intermediate = factor_history @ chol            # preserves Γ · f product
+    f_intermediate = factor_history @ chol  # preserves Γ · f product
 
     # Step 2: eigendecomp of factor covariance, descending eigenvalues.
     f_cov = (f_intermediate.T @ f_intermediate) / factor_history.shape[0]
     eigvals, eigvecs = np.linalg.eigh(f_cov)
     order = np.argsort(eigvals)[::-1]
-    rotation = eigvecs[:, order]                      # orthonormal K × K
+    rotation = eigvecs[:, order]  # orthonormal K × K
 
     # Step 3: deterministic sign convention. Eigenvectors are unique only up
     # to ±. Pin signs so each column of Γ has a non-negative max-magnitude

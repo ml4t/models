@@ -1,10 +1,4 @@
-"""Unit tests pinning KPS-faithful ΘY normalization in IPCA.
-
-Tests cover the post-fit identification block added in 2026-05-22 (FIX_SPEC_IPCA
-Phase B1, Diffs 1 + 2). The normalization is a rotation of (Γ, f_t) at fixed
-fit residuals, so predictions are unchanged at the ridge defaults
-`gamma_ridge = factor_ridge = 1e-6`.
-"""
+"""Unit tests pinning KPS-faithful ΘY normalization in IPCA."""
 
 from __future__ import annotations
 
@@ -53,9 +47,7 @@ def test_factor_covariance_is_diagonal_descending() -> None:
     np.testing.assert_allclose(off_diag, 0.0, atol=1e-8)
 
     diag = np.diag(f_cov)
-    assert np.all(np.diff(diag) <= 1e-10), (
-        f"factor variances must be descending; got diag={diag}"
-    )
+    assert np.all(np.diff(diag) <= 1e-10), f"factor variances must be descending; got diag={diag}"
     assert np.all(diag >= -1e-12), f"factor variances must be non-negative; got diag={diag}"
 
 
@@ -86,9 +78,7 @@ def test_extract_predictions_match_unnormalized_at_default_ridge() -> None:
     model.fit(batch)
     state = model.extract(batch)
 
-    reconstructed = np.einsum(
-        "tnk,tk->tn", state.asset_betas, state.factor_returns, optimize=True
-    )
+    reconstructed = np.einsum("tnk,tk->tn", state.asset_betas, state.factor_returns, optimize=True)
     valid = np.isfinite(reconstructed) & np.isfinite(batch.returns)
     # Per KPS, fit minimizes Σ (r - Z Γ f)². At default ridge the residual is
     # small and is the same as the un-normalized fit would deliver.
@@ -123,8 +113,7 @@ def test_normalize_theta_y_sign_convention_deterministic() -> None:
     for k in range(gamma_norm.shape[1]):
         argmax = int(np.argmax(np.abs(gamma_norm[:, k])))
         assert gamma_norm[argmax, k] >= 0.0, (
-            f"column {k}: max-magnitude entry must be non-negative; got "
-            f"{gamma_norm[argmax, k]}"
+            f"column {k}: max-magnitude entry must be non-negative; got {gamma_norm[argmax, k]}"
         )
 
 

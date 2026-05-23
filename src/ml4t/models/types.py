@@ -222,7 +222,7 @@ class FitSummary:
     converged: bool
     train_metrics: dict[str, float] = field(default_factory=dict)
     val_metrics: dict[str, float] = field(default_factory=dict)
-    best_epoch: int | None = None
+    best_epoch: Any | None = None
     history: tuple[dict[str, float | str], ...] = ()
     notes: tuple[str, ...] = ()
 
@@ -356,7 +356,7 @@ class StochasticDiscountFactorState:
 
     asset_weights: Array2D
     sdf_values: FloatArray1D | None = None
-    checkpoint_epoch: int | None = None
+    checkpoint_epoch: Any | None = None
     timestamps: tuple[Any, ...] = ()
     asset_ids: tuple[str, ...] = ()
     metadata: dict[str, Any] = field(default_factory=dict)

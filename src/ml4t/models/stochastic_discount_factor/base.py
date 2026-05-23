@@ -7,6 +7,8 @@ from abc import ABC, abstractmethod
 from ml4t.models.configs import StochasticDiscountFactorConfig
 from ml4t.models.types import CrossSectionBatch, FitSummary, StochasticDiscountFactorState
 
+type SDFCheckpoint = tuple[str, int]
+
 
 class BaseStochasticDiscountFactorModel(ABC):
     """Abstract base for stochastic discount factor models."""
@@ -20,11 +22,17 @@ class BaseStochasticDiscountFactorModel(ABC):
         return self._is_fitted
 
     @property
-    def available_checkpoints(self) -> tuple[int, ...]:
+    def available_checkpoints(self) -> tuple[SDFCheckpoint, ...]:
         return ()
 
     @abstractmethod
-    def fit(self, batch: CrossSectionBatch) -> FitSummary:
+    def fit(
+        self,
+        batch: CrossSectionBatch,
+        *,
+        validation_batch: CrossSectionBatch | None = None,
+        patience: int | None = None,
+    ) -> FitSummary:
         """Fit the stochastic discount factor model on a dated cross-sectional batch."""
 
     @abstractmethod
@@ -32,7 +40,7 @@ class BaseStochasticDiscountFactorModel(ABC):
         self,
         batch: CrossSectionBatch,
         *,
-        checkpoint: int | None = None,
+        checkpoint: SDFCheckpoint | int | None = None,
     ) -> StochasticDiscountFactorState:
         """Extract the structural stochastic discount factor state from a batch."""
 
