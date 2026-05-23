@@ -17,6 +17,7 @@ class BetaNetwork(nn.Module):
         in_features = n_characteristics
         for units in hidden_units:
             layers.append(nn.Linear(in_features, units))
+            layers.append(nn.BatchNorm1d(units))
             layers.append(nn.ReLU())
             in_features = units
         layers.append(nn.Linear(in_features, n_factors))

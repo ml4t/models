@@ -62,6 +62,7 @@ class CAEConfig(LatentFactorConfig):
     default_checkpoint: int | None = None
     lr: float = 1e-3
     lambda_l1: float = 1e-4
+    batch_size: int = 10_000
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,7 +81,7 @@ class StochasticDiscountFactorConfig(BaseModelConfig):
     n_epochs_cond: int = 1024
     checkpoint_interval: int | None = None
     checkpoint_epochs: tuple[int, ...] = ()
-    default_checkpoint: int | None = None
+    default_checkpoint: int | tuple[str, int] | None = None
     expected_return_mapper: str = "linear"
     beta_state_dim: int = 4
     beta_hidden_dim: int = 64

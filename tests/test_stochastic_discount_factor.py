@@ -57,19 +57,24 @@ def test_stochastic_discount_factor_extracts_weight_state_and_linear_mapping() -
         )
     )
     fit = model.fit(train)
-    train_state = model.extract(train, checkpoint=2)
-    future_state = model.extract(future, checkpoint=8)
+    train_state = model.extract(train, checkpoint=("unconditional", 2))
+    future_state = model.extract(future, checkpoint=("conditional", 4))
 
     mapper = LinearStochasticDiscountFactorReturnMapper()
     mapper_fit = mapper.fit(train_state, train)
     forecast = mapper.predict(future_state)
 
     assert fit.converged
-    assert model.available_checkpoints == (2, 4, 6, 8)
-    assert train_state.checkpoint_epoch == 2
+    assert model.available_checkpoints == (
+        ("unconditional", 2),
+        ("unconditional", 4),
+        ("conditional", 2),
+        ("conditional", 4),
+    )
+    assert train_state.checkpoint_epoch == ("unconditional", 2)
     assert train_state.sdf_values is not None
     assert train_state.asset_weights.shape == (n_periods, n_assets)
-    assert future_state.checkpoint_epoch == 8
+    assert future_state.checkpoint_epoch == ("conditional", 4)
     assert future_state.sdf_values is None
     assert future_state.asset_weights.shape == (3, n_assets)
     assert mapper_fit.converged
@@ -116,7 +121,7 @@ def test_stochastic_discount_factor_beta_head_returns_signals() -> None:
         )
     )
     model.fit(train)
-    train_state = model.extract(train, checkpoint=8)
+    train_state = model.extract(train, checkpoint=("conditional", 4))
 
     head = StochasticDiscountFactorBetaNetworkHead(model.config)
     fit = head.fit(train_state, train, validation_state=train_state, validation_batch=train)
@@ -130,7 +135,9 @@ def test_stochastic_discount_factor_beta_head_returns_signals() -> None:
     assert np.isfinite(signal.signal_values).any()
 
 
-def _sdf_batch(seed: int, n_periods: int = 8, n_assets: int = 6, n_features: int = 3) -> CrossSectionBatch:
+def _sdf_batch(
+    seed: int, n_periods: int = 8, n_assets: int = 6, n_features: int = 3
+) -> CrossSectionBatch:
     rng = np.random.default_rng(seed)
     characteristics = rng.normal(size=(n_periods, n_assets, n_features))
     signal = 0.4 * characteristics[..., 0] - 0.2 * characteristics[..., 1]
@@ -160,13 +167,16 @@ def test_phase_local_burn_in_resets_between_phases() -> None:
         )
     )
     model.fit(_sdf_batch(seed=1))
-    # Phase 1 global epochs 1-5: skip phase_epoch 1-3 -> keep 4, 5.
-    # Phase 3 global epochs 6-10 (phase_epoch 1-5): skip phase_epoch 1-3 -> keep 9, 10.
-    assert model.available_checkpoints == (4, 5, 9, 10)
-    # A global counter would have kept 6, 7, 8 (all > 3); phase-local burn-in drops them.
-    assert 6 not in model.available_checkpoints
-    assert 7 not in model.available_checkpoints
-    assert 8 not in model.available_checkpoints
+    # Each SDF training phase uses its own epoch index for burn-in and checkpoints.
+    assert model.available_checkpoints == (
+        ("unconditional", 4),
+        ("unconditional", 5),
+        ("conditional", 4),
+        ("conditional", 5),
+    )
+    assert ("conditional", 1) not in model.available_checkpoints
+    assert ("conditional", 2) not in model.available_checkpoints
+    assert ("conditional", 3) not in model.available_checkpoints
 
 
 def test_validation_best_checkpoints_tracked() -> None:
@@ -211,7 +221,7 @@ def test_validation_best_checkpoints_tracked() -> None:
 
     # Default extraction (no checkpoint) still selects a positive epoch, not a sentinel.
     default_state = model.extract(train)
-    assert default_state.checkpoint_epoch > 0
+    assert default_state.checkpoint_epoch == ("conditional", 6)
 
 
 def test_validation_batch_requires_returns() -> None:

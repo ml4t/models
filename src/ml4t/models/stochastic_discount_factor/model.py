@@ -10,20 +10,18 @@ import numpy as np
 
 from ml4t.models._internal.latent_factor_utils import (
     resolve_checkpoint_epochs,
-    select_checkpoint_epoch,
 )
 from ml4t.models._internal.torch_runtime import import_torch, resolve_device, seed_torch
 from ml4t.models.configs import StochasticDiscountFactorConfig
 from ml4t.models.stochastic_discount_factor.base import BaseStochasticDiscountFactorModel
 from ml4t.models.types import CrossSectionBatch, FitSummary, StochasticDiscountFactorState
 
-# CPZ best-by-validation checkpoint sentinels. Negative so they never collide
-# with the positive interval-checkpoint grid and never become the extract()
-# default (which is the largest available key, i.e. the final epoch).
-VAL_BEST_LOSS_UNCONDITIONAL = -1
-VAL_BEST_SHARPE_UNCONDITIONAL = -2
-VAL_BEST_LOSS_CONDITIONAL = -3
-VAL_BEST_SHARPE_CONDITIONAL = -4
+SDFCheckpoint = tuple[str, int]
+
+VAL_BEST_LOSS_UNCONDITIONAL: SDFCheckpoint = ("unconditional", 0)
+VAL_BEST_SHARPE_UNCONDITIONAL: SDFCheckpoint = ("unconditional", -1)
+VAL_BEST_LOSS_CONDITIONAL: SDFCheckpoint = ("conditional", 0)
+VAL_BEST_SHARPE_CONDITIONAL: SDFCheckpoint = ("conditional", -1)
 
 
 class StochasticDiscountFactorModel(BaseStochasticDiscountFactorModel):
@@ -31,15 +29,15 @@ class StochasticDiscountFactorModel(BaseStochasticDiscountFactorModel):
 
     def __init__(self, config: StochasticDiscountFactorConfig) -> None:
         super().__init__(config)
-        self._checkpoint_states: dict[int, dict[str, dict[str, Any]]] = {}
+        self._checkpoint_states: dict[SDFCheckpoint, dict[str, dict[str, Any]]] = {}
         self._asset_ids: tuple[str, ...] = ()
         self._n_characteristics: int | None = None
         self._n_context_features: int = 0
         self._history: tuple[dict[str, float | str], ...] = ()
 
     @property
-    def available_checkpoints(self) -> tuple[int, ...]:
-        return tuple(sorted(self._checkpoint_states))
+    def available_checkpoints(self) -> tuple[SDFCheckpoint, ...]:
+        return tuple(sorted(self._checkpoint_states, key=_checkpoint_sort_key))
 
     def fit(
         self,
@@ -85,9 +83,8 @@ class StochasticDiscountFactorModel(BaseStochasticDiscountFactorModel):
                 device=device,
             )
 
-        # Seed BEFORE constructing the networks so weight initialization is
-        # governed by config.seed (otherwise init draws from the un-seeded
-        # global RNG and SDF results are not reproducible across runs).
+        # Seed before network construction so initialization and training are
+        # reproducible for a fixed configuration.
         seed_torch(torch, self.config.seed, device)
         np.random.seed(self.config.seed)
 
@@ -117,17 +114,15 @@ class StochasticDiscountFactorModel(BaseStochasticDiscountFactorModel):
             weight_decay=self.config.weight_decay,
         )
 
-        total_epochs = self.config.n_epochs_unc + self.config.n_epochs_cond
         checkpoint_epochs = tuple(
             resolve_checkpoint_epochs(
-                total_epochs,
+                max(self.config.n_epochs_unc, self.config.n_epochs_cond),
                 checkpoint_interval=self.config.checkpoint_interval,
                 checkpoint_epochs=list(self.config.checkpoint_epochs) or None,
             )
         )
         self._checkpoint_states = defaultdict(dict)
         history: list[dict[str, float | str]] = []
-        sdf_epoch = 0
 
         val_tensors = (
             _prepare_sdf_tensors(validation_batch, torch, device)
@@ -141,7 +136,6 @@ class StochasticDiscountFactorModel(BaseStochasticDiscountFactorModel):
         epochs_since_improve = 0
 
         for phase_epoch in range(1, self.config.n_epochs_unc + 1):
-            sdf_epoch += 1
             stochastic_discount_factor_net.train()
             weights, _ = stochastic_discount_factor_net(
                 asset_features,
@@ -158,14 +152,14 @@ class StochasticDiscountFactorModel(BaseStochasticDiscountFactorModel):
             sharpe = nn.compute_sharpe(stochastic_discount_factor_values)
             history.append(
                 {
-                    "epoch": float(sdf_epoch),
+                    "epoch": float(phase_epoch),
                     "phase": "unconditional",
                     "train_loss": float(loss.item()),
                     "train_sharpe": float(sharpe.item()),
                 }
             )
             self._maybe_store_checkpoint(
-                epoch=sdf_epoch,
+                phase="unconditional",
                 phase_epoch=phase_epoch,
                 checkpoint_epochs=checkpoint_epochs,
                 stochastic_discount_factor_net=stochastic_discount_factor_net,
@@ -223,7 +217,6 @@ class StochasticDiscountFactorModel(BaseStochasticDiscountFactorModel):
         moment_net.load_state_dict(best_moment_state)
 
         for phase_epoch in range(1, self.config.n_epochs_cond + 1):
-            sdf_epoch += 1
             stochastic_discount_factor_net.train()
             moment_net.eval()
             weights, _ = stochastic_discount_factor_net(
@@ -243,14 +236,14 @@ class StochasticDiscountFactorModel(BaseStochasticDiscountFactorModel):
             sharpe = nn.compute_sharpe(stochastic_discount_factor_values)
             history.append(
                 {
-                    "epoch": float(sdf_epoch),
+                    "epoch": float(phase_epoch),
                     "phase": "conditional",
                     "train_loss": float(loss.item()),
                     "train_sharpe": float(sharpe.item()),
                 }
             )
             self._maybe_store_checkpoint(
-                epoch=sdf_epoch,
+                phase="conditional",
                 phase_epoch=phase_epoch,
                 checkpoint_epochs=checkpoint_epochs,
                 stochastic_discount_factor_net=stochastic_discount_factor_net,
@@ -295,12 +288,13 @@ class StochasticDiscountFactorModel(BaseStochasticDiscountFactorModel):
             converged=True,
             train_metrics={
                 "n_train_periods": float(batch.n_periods),
-                "n_checkpoints": float(len(checkpoint_epochs)),
+                "n_checkpoints": float(len(self.available_checkpoints)),
             },
-            best_epoch=select_checkpoint_epoch(
+            best_epoch=_select_checkpoint(
                 checkpoint=None,
                 configured_default=self.config.default_checkpoint,
-                available=checkpoint_epochs,
+                available=self.available_checkpoints,
+                n_epochs_unc=self.config.n_epochs_unc,
             ),
             history=self._history,
             notes=(
@@ -312,7 +306,7 @@ class StochasticDiscountFactorModel(BaseStochasticDiscountFactorModel):
         self,
         batch: CrossSectionBatch,
         *,
-        checkpoint: int | None = None,
+        checkpoint: SDFCheckpoint | int | None = None,
     ) -> StochasticDiscountFactorState:
         if not self.is_fitted or self._n_characteristics is None or not self._checkpoint_states:
             raise RuntimeError("StochasticDiscountFactorModel must be fitted before extract()")
@@ -335,10 +329,11 @@ class StochasticDiscountFactorModel(BaseStochasticDiscountFactorModel):
         torch = import_torch()
         nn = _import_stochastic_discount_factor_nn()
         device = resolve_device(torch, self.config.device)
-        selected_checkpoint = select_checkpoint_epoch(
+        selected_checkpoint = _select_checkpoint(
             checkpoint=checkpoint,
             configured_default=self.config.default_checkpoint,
             available=self.available_checkpoints,
+            n_epochs_unc=self.config.n_epochs_unc,
         )
         checkpoint_state = self._checkpoint_states[selected_checkpoint]
 
@@ -404,18 +399,15 @@ class StochasticDiscountFactorModel(BaseStochasticDiscountFactorModel):
     def _maybe_store_checkpoint(
         self,
         *,
-        epoch: int,
+        phase: str,
         phase_epoch: int,
         checkpoint_epochs: tuple[int, ...],
         stochastic_discount_factor_net: Any,
         moment_net: Any,
     ) -> None:
-        # Burn-in is phase-local (CPZ uses a per-phase `ignoreEpoch`); the
-        # storage key remains the global epoch so the positive checkpoint grid
-        # is unique across phases.
-        if phase_epoch <= self.config.burn_in_epochs or epoch not in checkpoint_epochs:
+        if phase_epoch <= self.config.burn_in_epochs or phase_epoch not in checkpoint_epochs:
             return
-        self._checkpoint_states[epoch] = _capture_state(
+        self._checkpoint_states[(phase, phase_epoch)] = _capture_state(
             stochastic_discount_factor_net, moment_net
         )
 
@@ -445,11 +437,69 @@ def _reshape_weight_panel(
     return panel
 
 
+def _checkpoint_sort_key(checkpoint: SDFCheckpoint) -> tuple[int, int]:
+    phase, epoch = checkpoint
+    phase_order = 0 if phase == "unconditional" else 1
+    return phase_order, epoch
+
+
+def _select_checkpoint(
+    *,
+    checkpoint: SDFCheckpoint | int | None,
+    configured_default: SDFCheckpoint | int | None,
+    available: tuple[SDFCheckpoint, ...],
+    n_epochs_unc: int,
+) -> SDFCheckpoint:
+    if not available:
+        raise ValueError("available_checkpoints is empty")
+    legacy_lookup = _legacy_checkpoint_lookup(available, n_epochs_unc=n_epochs_unc)
+    selected = checkpoint if checkpoint is not None else configured_default
+    if selected is not None:
+        if isinstance(selected, tuple):
+            if selected not in available:
+                raise ValueError(
+                    f"checkpoint={selected!r} is not in available_checkpoints={available}"
+                )
+            return selected
+        if int(selected) not in legacy_lookup:
+            raise ValueError(f"checkpoint={selected!r} is not in available_checkpoints={available}")
+        return legacy_lookup[int(selected)]
+
+    positive = [key for key in available if key[1] > 0]
+    return positive[-1] if positive else available[-1]
+
+
+def _legacy_checkpoint_lookup(
+    available: tuple[SDFCheckpoint, ...],
+    *,
+    n_epochs_unc: int,
+) -> dict[int, SDFCheckpoint]:
+    lookup: dict[int, SDFCheckpoint] = {}
+    sentinel_aliases = {
+        -4: VAL_BEST_SHARPE_CONDITIONAL,
+        -3: VAL_BEST_LOSS_CONDITIONAL,
+        -2: VAL_BEST_SHARPE_UNCONDITIONAL,
+        -1: VAL_BEST_LOSS_UNCONDITIONAL,
+    }
+    for legacy, key in sentinel_aliases.items():
+        if key in available:
+            lookup[legacy] = key
+    for key in available:
+        phase, phase_epoch = key
+        if phase_epoch <= 0:
+            continue
+        legacy_epoch = phase_epoch if phase == "unconditional" else n_epochs_unc + phase_epoch
+        lookup[legacy_epoch] = key
+    return lookup
+
+
 def _cpu_state_dict(model: Any) -> dict[str, Any]:
     return {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
 
 
-def _capture_state(stochastic_discount_factor_net: Any, moment_net: Any) -> dict[str, dict[str, Any]]:
+def _capture_state(
+    stochastic_discount_factor_net: Any, moment_net: Any
+) -> dict[str, dict[str, Any]]:
     return {
         "stochastic_discount_factor": _cpu_state_dict(stochastic_discount_factor_net),
         "moment": _cpu_state_dict(moment_net),
@@ -461,6 +511,8 @@ def _prepare_sdf_tensors(batch: CrossSectionBatch, torch: Any, device: Any) -> t
     mask = _resolve_mask(batch, torch, device)
     returns = torch.where(mask, returns_raw, torch.zeros_like(returns_raw))
     n_obs_per_asset = mask.float().sum(dim=0)
+    if int(mask.sum().item()) == 0:
+        raise ValueError("validation_batch contains no valid SDF validation observations")
     asset_features = torch.as_tensor(
         np.asarray(batch.characteristics, dtype=np.float32), dtype=torch.float32, device=device
     )
