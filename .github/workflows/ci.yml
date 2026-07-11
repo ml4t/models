@@ -108,10 +108,57 @@ jobs:
           .smoke-venv/bin/python -c "import ml4t.models as m; print(m.__version__)"
           .smoke-venv/bin/python -c "from ml4t.models import PCAModel, SAEModel, StochasticDiscountFactorModel"
 
+  mps-smoke:
+    name: MPS Smoke
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6.0.3
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.2.0
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Verify PyTorch MPS
+        run: |
+          uv run python - <<'PY'
+          import platform
+
+          import torch
+
+          from ml4t.models._internal.torch_runtime import resolve_device, seed_torch
+
+          print(platform.platform())
+          print("machine:", platform.machine())
+          print("torch:", torch.__version__)
+          print("mps built:", torch.backends.mps.is_built())
+          print("mps available:", torch.backends.mps.is_available())
+
+          assert platform.machine() == "arm64"
+          assert torch.backends.mps.is_built()
+          assert torch.backends.mps.is_available()
+
+          device = resolve_device(torch, "mps")
+          assert device.type == "mps"
+
+          seed_torch(torch, 42, device)
+          x = torch.ones(4, device=device)
+          y = x * 2
+          assert y.device.type == "mps"
+          assert y.cpu().tolist() == [2.0, 2.0, 2.0, 2.0]
+          PY
+
   build:
     name: Build Package
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, test, test-package-smoke]
+    needs: [lint, typecheck, test, test-package-smoke, mps-smoke]
     steps:
       - uses: actions/checkout@v6.0.3
         with:

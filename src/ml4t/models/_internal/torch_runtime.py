@@ -16,12 +16,21 @@ def import_torch() -> Any:
 
 
 def resolve_device(torch: Any, requested: str) -> Any:
-    if requested.startswith("cuda") and torch.cuda.is_available():
+    requested_device = requested.strip().lower()
+    if requested_device.startswith("cuda") and torch.cuda.is_available():
         return torch.device(requested)
+    mps_backend = getattr(torch.backends, "mps", None)
+    if requested_device == "mps" and mps_backend is not None and mps_backend.is_available():
+        return torch.device("mps")
     return torch.device("cpu")
 
 
 def seed_torch(torch: Any, seed: int, device: Any) -> None:
     torch.manual_seed(seed)
-    if getattr(device, "type", "cpu") == "cuda":
+    device_type = getattr(device, "type", "cpu")
+    if device_type == "cuda":
         torch.cuda.manual_seed_all(seed)
+    elif device_type == "mps":
+        mps_manual_seed = getattr(getattr(torch, "mps", None), "manual_seed", None)
+        if callable(mps_manual_seed):
+            mps_manual_seed(seed)
