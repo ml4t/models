@@ -18,7 +18,7 @@ def import_torch() -> Any:
 def resolve_device(torch: Any, requested: str) -> Any:
     requested_device = requested.strip().lower()
     if requested_device.startswith("cuda") and torch.cuda.is_available():
-        return torch.device(requested)
+        return torch.device(requested_device)
     mps_backend = getattr(torch.backends, "mps", None)
     if requested_device == "mps" and mps_backend is not None and mps_backend.is_available():
         return torch.device("mps")

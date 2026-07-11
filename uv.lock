@@ -808,7 +808,7 @@ requires-dist = [
     { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.24.0" },
     { name = "ml4t-specs", marker = "extra == 'all'", specifier = ">=0.1.0b0" },
     { name = "ml4t-specs", marker = "extra == 'integration'", specifier = ">=0.1.0b0" },
-    { name = "numpy", specifier = ">=1.26,<2.5" },
+    { name = "numpy", specifier = ">=1.26,<2.6" },
     { name = "polars", marker = "extra == 'all'", specifier = ">=1.0.0" },
     { name = "polars", marker = "extra == 'integration'", specifier = ">=1.0.0" },
     { name = "pre-commit", marker = "extra == 'all'", specifier = ">=3.3.0" },

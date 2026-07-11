@@ -46,6 +46,8 @@ class _FakeTorch:
         self.seeds: list[int] = []
 
     def device(self, requested: str) -> _FakeDevice:
+        if requested != requested.strip().lower():
+            raise ValueError("fake torch expects normalized device strings")
         return _FakeDevice(requested.split(":", maxsplit=1)[0])
 
     def manual_seed(self, seed: int) -> None:
@@ -62,6 +64,12 @@ def test_resolve_device_cuda_when_available() -> None:
     torch = _FakeTorch(cuda_available=True)
 
     assert resolve_device(torch, "cuda:0").type == "cuda"
+
+
+def test_resolve_device_normalizes_cuda_request() -> None:
+    torch = _FakeTorch(cuda_available=True)
+
+    assert resolve_device(torch, " CUDA:0 ").type == "cuda"
 
 
 def test_resolve_device_cuda_falls_back_to_cpu() -> None:

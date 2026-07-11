@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from importlib import import_module
 
-__version__ = "0.1.0a4"
+__version__ = "0.1.0a5"
 
 from ml4t.models.api import (
     AssetMapper,

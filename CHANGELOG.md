@@ -2,6 +2,13 @@
 
 All notable changes to `ml4t-models` will be documented in this file.
 
+## 0.1.0a5
+
+- Added Apple Silicon MPS device resolution and seeding support for Torch-backed models.
+- Added a non-skipping macOS arm64 CI smoke test that proves PyTorch MPS tensor execution.
+- Updated the NumPy requirement to allow NumPy 2.5 releases.
+- Fixed CUDA device normalization for whitespace or case variants such as `CUDA:0`.
+
 ## 0.1.0a4
 
 - Aligned conditional autoencoder training with shuffled mini-batches, BatchNorm hidden layers,
