@@ -73,6 +73,25 @@ The case studies are intended to act as:
 
 They should not define the public API by accident.
 
+## Compatibility Status
+
+The `0.1.0b0` beta line is validated against the Chapter 14 teaching flow and the shared
+case-study latent-factor bridge.
+
+| Book surface | Validation status |
+|---|---|
+| `14_latent_factors/04_ipca.ipynb` | full notebook execution passed |
+| `14_latent_factors/05_rp_pca.ipynb` | full notebook execution passed |
+| `14_latent_factors/06_conditional_autoencoder.ipynb` | full notebook execution passed |
+| `14_latent_factors/07_stochastic_discount_factor.ipynb` | full notebook execution passed |
+| `14_latent_factors/08_supervised_autoencoder.ipynb` | Papermill smoke execution passed; full production training is long-running |
+| `14_latent_factors/09_case_study_insights.ipynb` | full notebook execution passed |
+| `case_studies.utils.latent_factors.library_bridge` | synthetic PCA, IPCA, CAE, SAE, and SDF bridge smoke checks passed |
+
+The teaching notebooks keep hand-built implementations where that improves exposition. The
+case-study path uses `ml4t-models` through the shared latent-factor bridge so the same
+contracts are exercised in walk-forward validation and registry-backed analysis.
+
 ## Recommended Reading Order
 
 If you are moving from the book notebooks to the library:
