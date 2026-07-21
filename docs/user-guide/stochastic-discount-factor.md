@@ -21,6 +21,14 @@ The public extracted state is:
 
 - `StochasticDiscountFactorState`
 
+| Input contract | Native output | Primary use | Secondary mapping |
+|---|---|---|---|
+| `CrossSectionBatch` | `StochasticDiscountFactorState` | SDF weights and pricing-kernel series | optional expected-return projection |
+
+`returns` are required for fitting. `characteristics` describe the cross-section used by the
+weight network, and `context_features` can provide date-level state such as macro or market
+features.
+
 ## Why It Is Separate From Latent Factors
 
 Latent-factor models estimate:
@@ -85,6 +93,10 @@ Current helpers include:
 
 These are downstream transformations. They do not change the fact that the core estimator is
 weight-native.
+
+The linear mapper is a transparent baseline. The beta-network head is the flexible option
+when a nonlinear relation between SDF weights, characteristics, and return projections is
+useful for comparison or downstream ranking.
 
 The beta-network head is useful when you need an expected-return-like object for comparison
 with latent-factor studies, ranking experiments, or downstream backtests that expect asset

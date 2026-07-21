@@ -28,9 +28,6 @@ decomposition.
 
 ## Why It Lives Outside Latent Factors
 
-The library originally explored treating `SAE` as another latent-factor model. That turns
-out to be the wrong abstraction.
-
 In the current design:
 
 - `SAEModel` is a direct predictor
@@ -48,6 +45,10 @@ not:
 ```text
 cross-section batch -> factor state -> factor forecaster -> beta × lambda
 ```
+
+| Input contract | Native output | Assumption |
+|---|---|---|
+| `CrossSectionBatch` | `AssetSignalResult` | supervised targets are the object of interest |
 
 ## Checkpoints
 
@@ -81,6 +82,10 @@ with:
 - timestamps
 - asset IDs
 - selected checkpoint metadata
+
+The signal is not automatically calibrated as an expected return. Use the integration
+helpers to convert it to long-format signal frames, then evaluate or transform it in the
+diagnostic and backtest layers.
 
 ## When To Use It
 
