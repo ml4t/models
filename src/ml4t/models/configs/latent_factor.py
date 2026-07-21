@@ -42,7 +42,7 @@ class IPCAConfig(LatentFactorConfig):
     """Config for IPCA."""
 
     model_name: str = "ipca"
-    max_iter: int = 100
+    max_iter: int = 10_000
     tol: float = 1e-6
     factor_ridge: float = 1e-6
     gamma_ridge: float = 1e-6

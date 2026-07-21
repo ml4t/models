@@ -21,6 +21,9 @@ class IPCAModel(BaseLatentFactorModel[IPCAConfig]):
         self._n_features: int | None = None
         self._fit_iterations = 0
         self._fit_converged = False
+        self._fit_parameter_delta = float("inf")
+        self._fit_objective_delta = float("inf")
+        self._fit_forecast_delta = float("inf")
 
     @property
     def gamma(self) -> np.ndarray:
@@ -76,21 +79,19 @@ class IPCAModel(BaseLatentFactorModel[IPCAConfig]):
         )
         factor_history = np.zeros((len(train_designs), self.config.n_factors), dtype=np.float64)
         converged = False
+        previous_objective = float("inf")
+        target_sum_squares = float(sum(target @ target for target in train_targets))
 
         for iteration in range(1, self.config.max_iter + 1):
             previous_gamma = gamma.copy()
             previous_factors = factor_history.copy()
 
-            for date_idx, (design_t, target_t) in enumerate(
-                zip(train_designs, train_targets, strict=True)
-            ):
-                betas_t = design_t @ gamma
-                gram = betas_t.T @ betas_t + self.config.factor_ridge * np.eye(
-                    self.config.n_factors,
-                    dtype=np.float64,
-                )
-                rhs = betas_t.T @ target_t
-                factor_history[date_idx] = _solve_linear_system(gram, rhs)
+            factor_history = _estimate_factors(
+                train_ztz=train_ztz,
+                train_zty=train_zty,
+                gamma=gamma,
+                factor_ridge=self.config.factor_ridge,
+            )
 
             gamma = _estimate_gamma(
                 train_ztz=train_ztz,
@@ -100,9 +101,30 @@ class IPCAModel(BaseLatentFactorModel[IPCAConfig]):
                 gamma_ridge=self.config.gamma_ridge,
             )
 
+            # ALS parameters are rotationally unidentified. Put every iterate
+            # in the same Theta-Y representation before comparing it with the
+            # previous iterate; otherwise equivalent rotations can prevent the
+            # raw parameter deltas from converging.
+            gamma, factor_history = _normalize_theta_y(gamma, factor_history)
+
             gamma_delta = float(np.max(np.abs(gamma - previous_gamma)))
             factor_delta = float(np.max(np.abs(factor_history - previous_factors)))
-            if max(gamma_delta, factor_delta) <= self.config.tol:
+            self._fit_parameter_delta = max(gamma_delta, factor_delta)
+            previous_forecast = previous_gamma @ previous_factors.mean(axis=0)
+            current_forecast = gamma @ factor_history.mean(axis=0)
+            self._fit_forecast_delta = float(np.max(np.abs(current_forecast - previous_forecast)))
+            objective = _reconstruction_sse(
+                train_ztz=train_ztz,
+                train_zty=train_zty,
+                target_sum_squares=target_sum_squares,
+                gamma=gamma,
+                factor_history=factor_history,
+            )
+            if np.isfinite(previous_objective):
+                scale = max(abs(previous_objective), np.finfo(np.float64).eps)
+                self._fit_objective_delta = abs(objective - previous_objective) / scale
+            previous_objective = objective
+            if max(self._fit_objective_delta, self._fit_forecast_delta) <= self.config.tol:
                 converged = True
                 self._fit_iterations = iteration
                 break
@@ -111,16 +133,12 @@ class IPCAModel(BaseLatentFactorModel[IPCAConfig]):
 
         # Recompute factor history under the final gamma before applying
         # KPS ΘY normalization.
-        for date_idx, (design_t, target_t) in enumerate(
-            zip(train_designs, train_targets, strict=True)
-        ):
-            betas_t = design_t @ gamma
-            gram = betas_t.T @ betas_t + self.config.factor_ridge * np.eye(
-                self.config.n_factors,
-                dtype=np.float64,
-            )
-            rhs = betas_t.T @ target_t
-            factor_history[date_idx] = _solve_linear_system(gram, rhs)
+        factor_history = _estimate_factors(
+            train_ztz=train_ztz,
+            train_zty=train_zty,
+            gamma=gamma,
+            factor_ridge=self.config.factor_ridge,
+        )
 
         # Apply KPS appendix C.4 ΘY identification: Γ'Γ = I_K and
         # (1/T) Σ_t f_t f_t' diagonal with descending entries.
@@ -236,6 +254,9 @@ class IPCAModel(BaseLatentFactorModel[IPCAConfig]):
                 "persistent_entities": False,
                 "fit_iterations": self._fit_iterations,
                 "fit_converged": self._fit_converged,
+                "fit_parameter_delta": self._fit_parameter_delta,
+                "fit_objective_delta": self._fit_objective_delta,
+                "fit_forecast_delta": self._fit_forecast_delta,
             },
         )
 
@@ -319,16 +340,48 @@ def _estimate_gamma(
 ) -> np.ndarray:
     n_factors = factor_history.shape[1]
     ff = np.einsum("tk,tj->tkj", factor_history, factor_history)
-    lhs_blocks = np.einsum("tkj,tlm->kjlm", ff, train_ztz)
-    rhs_blocks = factor_history.T @ train_zty
+    lhs_blocks = np.einsum("tlm,tkj->lkmj", train_ztz, ff)
+    rhs_blocks = train_zty.T @ factor_history
 
     kron_dim = n_instruments * n_factors
-    lhs = lhs_blocks.transpose(0, 2, 1, 3).reshape(kron_dim, kron_dim)
+    lhs = lhs_blocks.reshape(kron_dim, kron_dim)
     lhs += gamma_ridge * np.eye(kron_dim, dtype=np.float64)
     rhs = rhs_blocks.reshape(kron_dim)
 
     gamma_vec = _solve_linear_system(lhs, rhs)
     return gamma_vec.reshape(n_instruments, n_factors)
+
+
+def _estimate_factors(
+    *,
+    train_ztz: np.ndarray,
+    train_zty: np.ndarray,
+    gamma: np.ndarray,
+    factor_ridge: float,
+) -> np.ndarray:
+    grams = np.einsum("lk,tlm,mj->tkj", gamma, train_ztz, gamma, optimize=True)
+    grams += factor_ridge * np.eye(gamma.shape[1], dtype=np.float64)[None, :, :]
+    rhs = train_zty @ gamma
+    try:
+        return np.linalg.solve(grams, rhs[..., None])[..., 0]
+    except np.linalg.LinAlgError:
+        return np.stack(
+            [_solve_linear_system(gram, target) for gram, target in zip(grams, rhs, strict=True)]
+        )
+
+
+def _reconstruction_sse(
+    *,
+    train_ztz: np.ndarray,
+    train_zty: np.ndarray,
+    target_sum_squares: float,
+    gamma: np.ndarray,
+    factor_history: np.ndarray,
+) -> float:
+    grams = np.einsum("lk,tlm,mj->tkj", gamma, train_ztz, gamma, optimize=True)
+    linear = np.einsum("tl,lk,tk->", train_zty, gamma, factor_history, optimize=True)
+    quadratic = np.einsum("tk,tkj,tj->", factor_history, grams, factor_history, optimize=True)
+    return float(max(target_sum_squares - 2.0 * linear + quadratic, 0.0))
 
 
 def _solve_linear_system(lhs: np.ndarray, rhs: np.ndarray) -> np.ndarray:
