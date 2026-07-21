@@ -115,6 +115,7 @@ nav:
   - Reference:
     - Architecture: reference/architecture.md
     - API Stability: reference/api-stability.md
+    - Release Gates: reference/release-gates.md
     - Model Families: reference/model-families.md
     - Academic References: reference/academic-references.md
 
