@@ -36,6 +36,10 @@ These help when your data starts as:
 - a polars frame
 - a long-format table with ML4T-style schema metadata
 
+If `ml4t-specs` is installed, the adapters accept `FeedSpec` objects directly. Without that
+optional dependency, they still accept explicit column names and plain metadata mappings.
+The library does not require users to source data through `ml4t-data`.
+
 ## Frame Adapters
 
 The frame helpers normalize model outputs into standard long-format tables.
@@ -73,6 +77,18 @@ These construct:
 - standardized signal frames
 - optional context frames
 - `FeedSpec`-compatible metadata for `ml4t-backtest`
+
+The handoff payload is intentionally shallow: it prepares frames and metadata, then lets
+`ml4t-backtest` own execution simulation.
+
+## Diagnostics Handoff
+
+`ml4t-models` emits prediction, signal, and weight frames with standard timestamp and asset
+columns. Use those frames as inputs to `ml4t-diagnostic` for cross-sectional IC, portfolio
+diagnostics, tearsheets, and validation reports.
+
+This library does not compute IC summaries or diagnostics itself. Keeping diagnostics in
+`ml4t-diagnostic` prevents model implementations from carrying a second evaluation stack.
 
 ## Artifact Writing
 

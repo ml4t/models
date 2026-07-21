@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from ml4t.models import (
     AssetForecastResult,
@@ -42,6 +43,32 @@ def test_resolve_feed_spec_mapping_uses_nested_schema_metadata() -> None:
             },
         },
     )
+
+    assert feed_spec["timestamp_col"] == "date"
+    assert feed_spec["entity_col"] == "ticker"
+    assert feed_spec["close_col"] == "settle"
+    assert feed_spec["price_col"] == "settle"
+    assert feed_spec["calendar"] == "NYSE"
+    assert feed_spec["timezone"] == "America/New_York"
+
+
+def test_resolve_feed_spec_mapping_accepts_ml4t_specs_feedspec() -> None:
+    specs = pytest.importorskip("ml4t.specs.market_data")
+
+    frame = {
+        "date": np.array(["2024-01-01", "2024-01-01"], dtype=object),
+        "ticker": np.array(["AAPL", "MSFT"], dtype=object),
+        "settle": np.array([100.0, 200.0], dtype=np.float64),
+    }
+    schema = specs.FeedSpec(
+        timestamp_col="date",
+        entity_col="ticker",
+        close_col="settle",
+        calendar="NYSE",
+        timezone="America/New_York",
+    )
+
+    feed_spec = resolve_feed_spec_mapping(frame, schema=schema)
 
     assert feed_spec["timestamp_col"] == "date"
     assert feed_spec["entity_col"] == "ticker"
