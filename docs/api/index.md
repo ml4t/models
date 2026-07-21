@@ -71,6 +71,11 @@ The package root re-exports the main model classes, configs, batches, results, a
         - PortfolioAllocationPipeline
         - PortfolioPipelineFitResult
 
+## Stability
+
+The [API Stability](../reference/api-stability.md) page defines the public
+surface intended to remain stable through the `0.1` beta series.
+
 ## Integration
 
 ::: ml4t.models.integration
@@ -87,4 +92,3 @@ The package root re-exports the main model classes, configs, batches, results, a
 | `ml4t.models.stochastic_discount_factor` | weight-native SDF estimation and return projections |
 | `ml4t.models.asset_prediction` | direct asset-level predictors |
 | `ml4t.models.portfolio` | end-to-end portfolio learners |
-
