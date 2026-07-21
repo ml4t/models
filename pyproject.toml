@@ -41,7 +41,7 @@ keywords = [
     "quantitative-finance",
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Financial and Insurance Industry",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
