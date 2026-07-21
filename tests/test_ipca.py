@@ -79,3 +79,31 @@ def test_ipca_extracts_betas_without_future_returns() -> None:
     assert state.asset_betas.shape == (3, 5, 1)
     assert np.isnan(state.asset_betas[0, 1, 0])
     assert np.isfinite(state.asset_betas[0, 0, 0])
+
+
+def test_ipca_recovers_multi_factor_structure() -> None:
+    rng = np.random.default_rng(19)
+    n_periods = 60
+    n_assets = 30
+    n_features = 6
+    n_factors = 3
+    characteristics = rng.normal(size=(n_periods, n_assets, n_features))
+    gamma = rng.normal(scale=0.3, size=(n_features + 1, n_factors))
+    factors = rng.normal(scale=0.5, size=(n_periods, n_factors))
+    augmented = np.concatenate(
+        [np.ones((n_periods, n_assets, 1), dtype=np.float64), characteristics],
+        axis=2,
+    )
+    betas = np.einsum("tnl,lk->tnk", augmented, gamma, optimize=True)
+    returns = np.einsum("tnk,tk->tn", betas, factors, optimize=True)
+    returns += 0.01 * rng.normal(size=returns.shape)
+    batch = CrossSectionBatch(characteristics=characteristics, returns=returns)
+    model = IPCAModel(IPCAConfig(n_factors=n_factors, max_iter=400, tol=1e-6))
+
+    fit = model.fit(batch)
+    state = model.extract(batch)
+    reconstructed = np.einsum("tnk,tk->tn", state.asset_betas, state.factor_returns, optimize=True)
+    mse = float(np.nanmean((reconstructed - returns) ** 2))
+
+    assert fit.converged
+    assert mse < 5e-3

@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 from ml4t.models import CrossSectionBatch, IPCAConfig, IPCAModel
-from ml4t.models.latent_factors.ipca import _normalize_theta_y
+from ml4t.models.latent_factors.ipca import _estimate_factors, _normalize_theta_y
 
 
 def _make_panel(*, n_periods: int, n_assets: int, n_features: int, n_factors: int, seed: int):
@@ -49,6 +49,41 @@ def test_factor_covariance_is_diagonal_descending() -> None:
     diag = np.diag(f_cov)
     assert np.all(np.diff(diag) <= 1e-10), f"factor variances must be descending; got diag={diag}"
     assert np.all(diag >= -1e-12), f"factor variances must be non-negative; got diag={diag}"
+
+
+def test_als_convergence_compares_identified_iterates() -> None:
+    batch = _make_panel(n_periods=60, n_assets=20, n_features=12, n_factors=5, seed=99)
+    model = IPCAModel(IPCAConfig(n_factors=5, max_iter=400, tol=1e-6))
+
+    fit = model.fit(batch)
+
+    assert fit.converged
+    assert model._fit_iterations < model.config.max_iter
+    assert model._fit_objective_delta <= model.config.tol
+    assert model._fit_forecast_delta <= model.config.tol
+
+
+def test_vectorized_factor_step_matches_datewise_solves() -> None:
+    rng = np.random.default_rng(101)
+    n_periods, n_instruments, n_factors = 7, 6, 3
+    raw = rng.normal(size=(n_periods, n_instruments, n_instruments))
+    train_ztz = np.einsum("tij,tkj->tik", raw, raw)
+    train_zty = rng.normal(size=(n_periods, n_instruments))
+    gamma = rng.normal(size=(n_instruments, n_factors))
+    ridge = 1e-6
+
+    vectorized = _estimate_factors(
+        train_ztz=train_ztz,
+        train_zty=train_zty,
+        gamma=gamma,
+        factor_ridge=ridge,
+    )
+    datewise = []
+    for ztz_t, zty_t in zip(train_ztz, train_zty, strict=True):
+        gram = gamma.T @ ztz_t @ gamma + ridge * np.eye(n_factors)
+        datewise.append(np.linalg.solve(gram, gamma.T @ zty_t))
+
+    np.testing.assert_allclose(vectorized, np.stack(datewise), atol=1e-12)
 
 
 def test_predictions_invariant_to_normalization() -> None:
