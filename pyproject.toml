@@ -13,6 +13,7 @@ namespaces = true
 include = [
     "/src",
     "/tests",
+    "/examples",
     "/README.md",
     "/LICENSE",
     "/CHANGELOG.md",
