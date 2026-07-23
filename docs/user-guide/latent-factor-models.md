@@ -17,12 +17,12 @@ The family splits into two groups:
 
 ## Overview
 
-| Model | Contract | Loading structure | Predictive object |
-|---|---|---|---|
-| `PCAModel` | `PersistentPanelBatch` | static loadings | `beta × premium` after a forecaster |
-| `RPPCAModel` | `PersistentPanelBatch` | static loadings with risk-premium-aware extraction | `beta × premium` after a forecaster |
-| `IPCAModel` | `CrossSectionBatch` | linear characteristic-implied betas | `beta × premium` after a forecaster |
-| `CAEModel` | `CrossSectionBatch` | nonlinear characteristic-implied betas | `beta × premium` after a forecaster |
+| Model | Input contract | Native output | Main assumption | Predictive object |
+|---|---|---|---|---|
+| `PCAModel` | `PersistentPanelBatch` | `LatentFactorState` with static loadings and factor returns | stable asset IDs | `beta × premium` after a forecaster |
+| `RPPCAModel` | `PersistentPanelBatch` | `LatentFactorState` with pricing-aware static loadings | stable asset IDs and meaningful cross-sectional means | `beta × premium` after a forecaster |
+| `IPCAModel` | `CrossSectionBatch` | `LatentFactorState` with characteristic-implied betas | dated characteristics parameterize conditional exposures | `beta × premium` after a forecaster |
+| `CAEModel` | `CrossSectionBatch` | `LatentFactorState` with nonlinear characteristic betas | nonlinear exposure map can be learned from cross-sections | `beta × premium` after a forecaster |
 
 ## PCA
 
@@ -45,6 +45,9 @@ It does not directly forecast expected returns. That requires:
 
 1. a factor-premium forecast
 2. an asset mapper
+
+Do not use PCA when the asset axis is an unstable identifier field. PCA and RP-PCA rely on
+the same entity occupying the same panel slot through time.
 
 ## RP-PCA
 
@@ -74,6 +77,9 @@ Key config fields:
 - `normalize_loadings`
 - `orthogonalize_factors`
 
+The `gamma` parameter in `RPPCAConfig` is the RP-PCA pricing-error weight, not an exposure
+matrix. The fitted loadings are returned in `LatentFactorState.asset_betas`.
+
 ## IPCA
 
 `IPCAModel` is the linear bridge between PCA and neural conditional factor models.
@@ -88,6 +94,7 @@ In the library, `IPCAModel`:
 - consumes `CrossSectionBatch`
 - alternates between factor estimation and gamma estimation
 - returns a `LatentFactorState` with conditional betas and factor history
+- reports ALS convergence metadata in `LatentFactorState.metadata`
 
 The economic interpretation follows
 [Kelly, Pruitt, and Su (2019)](../reference/academic-references.md#ref-kelly-pruitt-su-2019):
@@ -127,6 +134,10 @@ Current implementation features:
 - checkpoint-aware training
 - optional ensemble averaging across saved checkpoints
 - classification mode that still keeps factor construction tied to continuous returns
+
+Checkpoint selection changes the extracted structural state. If you pass
+`checkpoint=10`, the betas and factor history come from the checkpoint saved at epoch 10,
+not from the final training epoch.
 
 This is the right way to think about the model:
 

@@ -129,6 +129,14 @@ def resolve_feed_spec_mapping(
         if value is not None:
             spec_mapping[key] = value
 
+    if price_col is None:
+        if close_col is not None:
+            spec_mapping["price_col"] = close_col
+        elif spec_mapping.get("price_col") == "close" and spec_mapping.get("close_col") not in (
+            None,
+            "close",
+        ):
+            spec_mapping["price_col"] = spec_mapping["close_col"]
     if "close_col" in spec_mapping and "price_col" not in spec_mapping:
         spec_mapping["price_col"] = spec_mapping["close_col"]
     spec_mapping.setdefault("price_col", "close")

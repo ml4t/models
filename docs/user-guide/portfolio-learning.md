@@ -12,11 +12,11 @@ This family covers two related ideas:
 
 ## Family Overview
 
-| Model | Style | Native output |
-|---|---|---|
-| `LinearFeaturePortfolioModel` | deterministic baseline | `PortfolioWeightsResult` |
-| `LSTMPortfolioModel` | sequence baseline | `PortfolioWeightsResult` |
-| `DeepPortfolioModel` | structured DeePM-style allocator | `PortfolioWeightsResult` |
+| Model | Input contract | Style | Native output | Main assumption |
+|---|---|---|---|---|
+| `LinearFeaturePortfolioModel` | `PortfolioSequenceBatch` | deterministic baseline | `PortfolioWeightsResult` | pooled feature scores can rank allocation desirability |
+| `LSTMPortfolioModel` | `PortfolioSequenceBatch` | sequence baseline | `PortfolioWeightsResult` | recent feature paths contain allocation-relevant state |
+| `DeepPortfolioModel` | `PortfolioSequenceBatch` | structured DeePM-style allocator | `PortfolioWeightsResult` | temporal, cross-sectional, and graph structure can improve direct allocations |
 
 ## Shared Contract
 
@@ -135,3 +135,7 @@ Current helper:
 
 Use it when you want to transform raw learned weights into a stricter target-weights frame
 before handing them to `ml4t-backtest`.
+
+Postprocessing is deliberately separate from model fitting. This lets the same trained
+allocator be evaluated under different exposure caps, leverage normalization rules, or
+turnover controls.

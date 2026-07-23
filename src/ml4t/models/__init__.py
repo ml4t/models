@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from importlib import import_module
 
-__version__ = "0.1.0a6"
+__version__ = "0.1.0b0"
 
 from ml4t.models.api import (
     AssetMapper,
@@ -69,6 +69,7 @@ from ml4t.models.latent_factors import CAEModel, IPCAModel, PCAModel, RPPCAModel
 from ml4t.models.mappers import BetaLambdaMapper
 from ml4t.models.pipelines import (
     LatentFactorForecastPipeline,
+    PipelineFitResult,
     PortfolioAllocationPipeline,
     PortfolioPipelineFitResult,
 )
@@ -139,6 +140,7 @@ __all__ = [
     "PCAModel",
     "PersistentPanelBatch",
     "PipelineConfig",
+    "PipelineFitResult",
     "PortfolioAllocationPipeline",
     "PortfolioConfig",
     "PortfolioPipelineFitResult",

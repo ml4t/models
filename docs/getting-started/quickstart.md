@@ -6,6 +6,9 @@ This quickstart shows the three main workflows in the library:
 2. stochastic discount factor extraction
 3. end-to-end portfolio learning
 
+The same workflows are available as executable smoke examples in the repository's
+`examples/` directory.
+
 ## 1. Latent-Factor Forecasting
 
 The latent-factor path is intentionally three-stage:

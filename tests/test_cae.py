@@ -3,7 +3,14 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from ml4t.models import CAEConfig, CAEModel, CrossSectionBatch
+from ml4t.models import (
+    BetaLambdaMapper,
+    CAEConfig,
+    CAEModel,
+    CrossSectionBatch,
+    ExpandingMeanFactorForecaster,
+    LatentFactorForecastPipeline,
+)
 from ml4t.models._internal import cae_nn
 
 torch = pytest.importorskip("torch")
@@ -137,3 +144,49 @@ def test_cae_extract_per_member_returns_member_states() -> None:
     assert len(states) == 2
     assert all(state.asset_betas.shape == (n_periods, n_assets, 1) for state in states)
     assert [state.metadata["ensemble_member"] for state in states] == [0, 1]
+
+
+def test_cae_pipeline_forecasts_returns_through_checkpointed_two_step_path() -> None:
+    rng = np.random.default_rng(13)
+    n_periods = 8
+    n_assets = 7
+    n_features = 3
+    characteristics = rng.normal(size=(n_periods, n_assets, n_features))
+    returns = 0.03 * characteristics[..., 0] - 0.02 * characteristics[..., 1]
+    returns += 0.01 * rng.normal(size=returns.shape)
+    train = CrossSectionBatch(
+        characteristics=characteristics,
+        returns=returns,
+        timestamps=tuple(f"2024-{month:02d}" for month in range(1, n_periods + 1)),
+        asset_ids=tuple(f"A{idx}" for idx in range(n_assets)),
+    )
+    future = CrossSectionBatch(
+        characteristics=rng.normal(size=(3, n_assets, n_features)),
+        timestamps=("2024-09", "2024-10", "2024-11"),
+        asset_ids=tuple(f"A{idx}" for idx in range(n_assets)),
+    )
+    pipeline = LatentFactorForecastPipeline(
+        model=CAEModel(
+            CAEConfig(
+                n_factors=1,
+                hidden_units=(4,),
+                n_epochs=6,
+                checkpoint_interval=3,
+                n_ensemble=1,
+                batch_size=8,
+                lr=1e-2,
+            )
+        ),
+        forecaster=ExpandingMeanFactorForecaster(),
+        mapper=BetaLambdaMapper(),
+    )
+
+    fit = pipeline.fit(train)
+    prediction = pipeline.predict(future, checkpoint=3)
+
+    assert fit.structural_fit.converged
+    assert prediction.state.factor_returns is None
+    assert prediction.state.checkpoint_epoch == 3
+    assert prediction.factor_forecast.factor_premia.shape == (3, 1)
+    assert prediction.asset_forecast.expected_returns.shape == (3, n_assets)
+    assert np.isfinite(prediction.asset_forecast.expected_returns).all()
