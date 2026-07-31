@@ -9,7 +9,12 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from scripts.ci import candidate, check_performance, performance_qualification
+from scripts.ci import (
+    candidate,
+    check_performance,
+    hardware_qualification,
+    performance_qualification,
+)
 
 
 @pytest.fixture(scope="module")
@@ -146,3 +151,19 @@ def test_performance_profiles_cover_representative_public_model_families() -> No
 
     assert set(performance_qualification.CANONICAL) == expected
     assert set(performance_qualification.SMOKE) == expected
+
+
+def test_hardware_qualification_separates_replay_and_cpu_recovery_tolerances() -> None:
+    expected = np.zeros(1)
+    cross_backend = np.full(1, 2e-5)
+
+    with pytest.raises(AssertionError, match="replay tolerance"):
+        hardware_qualification._assert_close("model", expected, cross_backend, "cuda")
+
+    hardware_qualification._assert_close(
+        "model",
+        expected,
+        cross_backend,
+        "cuda",
+        cpu_recovery=True,
+    )
