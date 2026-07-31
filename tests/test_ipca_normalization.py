@@ -139,17 +139,14 @@ def test_normalize_theta_y_idempotent() -> None:
 
 
 def test_normalize_theta_y_sign_convention_deterministic() -> None:
-    """Sign convention: each column of Γ has non-negative max-magnitude entry."""
+    """The KPS sign convention gives each exposed factor a non-negative mean."""
     rng = np.random.default_rng(41)
     gamma = rng.normal(size=(7, 4))
     factor_history = rng.normal(scale=0.5, size=(60, 4))
 
-    gamma_norm, _ = _normalize_theta_y(gamma, factor_history)
-    for k in range(gamma_norm.shape[1]):
-        argmax = int(np.argmax(np.abs(gamma_norm[:, k])))
-        assert gamma_norm[argmax, k] >= 0.0, (
-            f"column {k}: max-magnitude entry must be non-negative; got {gamma_norm[argmax, k]}"
-        )
+    _, factors_norm = _normalize_theta_y(gamma, factor_history)
+
+    assert np.all(factors_norm.mean(axis=0) >= 0.0)
 
 
 def test_final_factor_recomputation_at_non_convergence() -> None:
