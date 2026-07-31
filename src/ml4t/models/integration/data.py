@@ -167,23 +167,25 @@ def cross_section_batch_from_long_frame(
         frame, timestamp_col=resolved.timestamp_col, entity_col=resolved.entity_col
     )
     timestamps = tuple(_ordered_unique(record[resolved.timestamp_col] for record in records))
+    asset_ids = tuple(
+        str(asset) for asset in _ordered_unique(record[resolved.entity_col] for record in records)
+    )
+    asset_index = {asset: idx for idx, asset in enumerate(asset_ids)}
     grouped_assets = {
         timestamp: [record for record in records if record[resolved.timestamp_col] == timestamp]
         for timestamp in timestamps
     }
-    max_assets = max((len(group) for group in grouped_assets.values()), default=0)
     characteristics = np.full(
-        (len(timestamps), max_assets, len(feature_cols)),
+        (len(timestamps), len(asset_ids), len(feature_cols)),
         np.nan,
         dtype=np.float64,
     )
     returns = (
-        np.full((len(timestamps), max_assets), np.nan, dtype=np.float64)
+        np.full((len(timestamps), len(asset_ids)), np.nan, dtype=np.float64)
         if return_col is not None
         else None
     )
-    mask = np.zeros((len(timestamps), max_assets), dtype=bool)
-    asset_ids = tuple(f"slot_{idx}" for idx in range(max_assets))
+    mask = np.zeros((len(timestamps), len(asset_ids)), dtype=bool)
 
     context_features = None
     if context_cols:
@@ -191,16 +193,23 @@ def cross_section_batch_from_long_frame(
 
     for t_idx, timestamp in enumerate(timestamps):
         records_t = grouped_assets[timestamp]
-        for slot_idx, record in enumerate(records_t):
-            mask[t_idx, slot_idx] = True
+        seen_assets: set[str] = set()
+        for record in records_t:
+            asset = str(record[resolved.entity_col])
+            if asset in seen_assets:
+                raise ValueError(
+                    "Duplicate (timestamp, entity) row encountered in long-format "
+                    f"cross-sectional data: {(timestamp, asset)}"
+                )
+            seen_assets.add(asset)
+            a_idx = asset_index[asset]
+            mask[t_idx, a_idx] = True
             for f_idx, feature_col in enumerate(feature_cols):
                 value = record[feature_col]
-                characteristics[t_idx, slot_idx, f_idx] = (
-                    float(value) if _is_finite(value) else np.nan
-                )
+                characteristics[t_idx, a_idx, f_idx] = float(value) if _is_finite(value) else np.nan
             if returns is not None and return_col is not None:
                 value = record[return_col]
-                returns[t_idx, slot_idx] = float(value) if _is_finite(value) else np.nan
+                returns[t_idx, a_idx] = float(value) if _is_finite(value) else np.nan
 
         if context_features is not None and records_t:
             for c_idx, context_col in enumerate(context_cols):

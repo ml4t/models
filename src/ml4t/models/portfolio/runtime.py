@@ -26,11 +26,39 @@ class PortfolioTrainingArtifacts:
     best_validation_sharpe: float
 
 
-def validate_portfolio_batch(batch: PortfolioSequenceBatch) -> None:
+def validate_portfolio_training_batch(
+    batch: PortfolioSequenceBatch,
+    config: PortfolioConfig | None = None,
+) -> None:
     if batch.returns is None:
         raise ValueError("portfolio training requires forward returns in the batch")
-    if batch.vol_scale is None:
-        raise ValueError("portfolio training requires vol_scale in the batch")
+    if config is not None:
+        _validate_context(batch, config)
+
+
+def validate_portfolio_prediction_batch(
+    batch: PortfolioSequenceBatch,
+    config: PortfolioConfig,
+) -> None:
+    _validate_context(batch, config)
+
+
+def validate_portfolio_identity(
+    batch: PortfolioSequenceBatch,
+    fitted_asset_ids: tuple[str, ...],
+) -> None:
+    if batch.asset_ids != fitted_asset_ids:
+        raise ValueError(
+            "prediction asset_ids must exactly match fitted asset_ids; "
+            f"expected {fitted_asset_ids}, got {batch.asset_ids}"
+        )
+
+
+def _validate_context(batch: PortfolioSequenceBatch, config: PortfolioConfig) -> None:
+    if config.use_group_embedding and batch.group_ids is None:
+        raise ValueError("group_ids are required when use_group_embedding is True")
+    if config.use_cost_in_context and batch.costs is None:
+        raise ValueError("costs are required when use_cost_in_context is True")
 
 
 def fit_policy_network(
@@ -174,7 +202,7 @@ def build_loader(
     dataset = TensorDataset(
         torch.as_tensor(batch.features, dtype=torch.float32),
         torch.as_tensor(batch.returns, dtype=torch.float32),
-        torch.as_tensor(batch.vol_scale, dtype=torch.float32),
+        torch.as_tensor(_vol_scale(batch), dtype=torch.float32),
         torch.as_tensor(
             np.asarray(batch.mask, dtype=np.float32)
             if batch.mask is not None
@@ -198,7 +226,7 @@ def evaluate_pooled_sharpe(
     policy.eval()
     features = torch.as_tensor(batch.features, dtype=torch.float32, device=device)
     forward_returns = torch.as_tensor(batch.returns, dtype=torch.float32, device=device)
-    vol_scale = torch.as_tensor(batch.vol_scale, dtype=torch.float32, device=device)
+    vol_scale = torch.as_tensor(_vol_scale(batch), dtype=torch.float32, device=device)
     mask = mask_tensor(batch, device)
     asset_indices = torch.arange(batch.n_assets, dtype=torch.long, device=device)
 
@@ -249,6 +277,12 @@ def costs_tensor(batch: PortfolioSequenceBatch, device: torch.device) -> torch.T
     if costs.ndim == 1:
         costs = costs[:, None]
     return torch.as_tensor(costs, dtype=torch.float32, device=device)
+
+
+def _vol_scale(batch: PortfolioSequenceBatch) -> np.ndarray:
+    if batch.vol_scale is None:
+        return np.ones(batch.features.shape[:3], dtype=np.float64)
+    return np.asarray(batch.vol_scale, dtype=np.float64)
 
 
 def adjacency_mask_tensor(

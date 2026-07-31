@@ -79,4 +79,30 @@ def test_cross_section_batch_from_long_frame_builds_mask_and_context_features() 
     assert batch.context_features.shape == (2, 1)
     assert batch.mask is not None
     assert batch.mask[1, 1] == np.False_
+    assert batch.asset_ids == ("AAPL", "MSFT")
     assert batch.context_features[1, 0] == 2.0
+
+
+def test_cross_section_long_frame_preserves_identity_across_entry_exit_and_reorder() -> None:
+    frame = {
+        "date": np.array(
+            ["2024-01-02", "2024-01-01", "2024-01-03", "2024-01-01", "2024-01-02"],
+            dtype=object,
+        ),
+        "asset": np.array(["B", "B", "C", "A", "A"], dtype=object),
+        "feature": np.array([20.0, 2.0, 30.0, 1.0, 10.0], dtype=np.float64),
+    }
+
+    batch = cross_section_batch_from_long_frame(frame, feature_cols=("feature",))
+
+    assert batch.timestamps == ("2024-01-01", "2024-01-02", "2024-01-03")
+    assert batch.asset_ids == ("A", "B", "C")
+    assert batch.mask is not None
+    assert batch.mask.tolist() == [
+        [True, True, False],
+        [True, True, False],
+        [False, False, True],
+    ]
+    assert batch.characteristics[0, 0, 0] == 1.0
+    assert batch.characteristics[0, 1, 0] == 2.0
+    assert batch.characteristics[2, 2, 0] == 30.0

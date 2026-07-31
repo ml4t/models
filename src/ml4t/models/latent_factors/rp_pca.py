@@ -7,6 +7,7 @@ import numpy as np
 from ml4t.models.api import PanelBatch
 from ml4t.models.configs import RPPCAConfig
 from ml4t.models.latent_factors.base import BaseLatentFactorModel
+from ml4t.models.latent_factors.pca import _resolve_asset_order
 from ml4t.models.types import FitSummary, LatentFactorState, PersistentPanelBatch
 
 
@@ -102,20 +103,24 @@ class RPPCAModel(BaseLatentFactorModel[RPPCAConfig]):
         *,
         checkpoint: int | None = None,
     ) -> LatentFactorState:
-        del checkpoint
+        if checkpoint is not None:
+            raise ValueError("RPPCAModel does not expose checkpoints; checkpoint must be None")
         persistent = _require_persistent_panel(batch)
         if not self.is_fitted or self._asset_betas is None or self._factor_weights is None:
             raise RuntimeError("RP-PCA model must be fitted before extract()")
 
+        order = _resolve_asset_order(persistent.asset_ids, self._asset_ids, persistent.n_assets)
+        factor_weights = self._factor_weights[order]
         factor_returns = None
         if persistent.returns is not None:
             returns = np.asarray(persistent.returns, dtype=np.float64)
             returns = np.where(np.isfinite(returns), returns, 0.0)
-            factor_returns = returns @ self._factor_weights
+            factor_returns = returns @ factor_weights
 
+        fitted_betas = self._asset_betas[order]
         asset_betas = np.broadcast_to(
-            self._asset_betas[None, :, :],
-            (persistent.n_periods, self._asset_betas.shape[0], self._asset_betas.shape[1]),
+            fitted_betas[None, :, :],
+            (persistent.n_periods, fitted_betas.shape[0], fitted_betas.shape[1]),
         ).copy()
         metadata: dict[str, object] = {
             "model_name": self.config.model_name,

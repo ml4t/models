@@ -26,7 +26,9 @@ from ml4t.models.portfolio.runtime import (
     fit_policy_network,
     group_ids_tensor,
     mask_tensor,
-    validate_portfolio_batch,
+    validate_portfolio_identity,
+    validate_portfolio_prediction_batch,
+    validate_portfolio_training_batch,
 )
 from ml4t.models.types import FitSummary, PortfolioSequenceBatch, PortfolioWeightsResult
 
@@ -166,6 +168,7 @@ class DeepPortfolioModel(BasePortfolioModel):
         self._n_assets: int | None = None
         self._n_features: int | None = None
         self._n_groups: int | None = None
+        self._adjacency_mask: np.ndarray | None = None
         self._checkpoint_states: dict[int, dict[str, torch.Tensor]] = {}
         self._history: tuple[dict[str, float | str], ...] = ()
 
@@ -179,13 +182,17 @@ class DeepPortfolioModel(BasePortfolioModel):
         *,
         validation_batch: PortfolioSequenceBatch | None = None,
     ) -> FitSummary:
-        validate_portfolio_batch(batch)
+        validate_portfolio_training_batch(batch, self.config)
         validation_batch = validation_batch or batch
-        validate_portfolio_batch(validation_batch)
+        validate_portfolio_training_batch(validation_batch, self.config)
         if batch.n_assets != validation_batch.n_assets:
             raise ValueError("train and validation batches must share the asset dimension")
         if batch.features.shape[3] != validation_batch.features.shape[3]:
             raise ValueError("train and validation batches must share the feature dimension")
+        if batch.asset_ids != validation_batch.asset_ids:
+            raise ValueError("train and validation batches must share asset_ids")
+        if not _same_optional_array(batch.adjacency_mask, validation_batch.adjacency_mask):
+            raise ValueError("train and validation batches must share adjacency_mask")
 
         device = resolve_device(torch, self.config.device)
         seed_torch(torch, self.config.seed, device)
@@ -211,6 +218,11 @@ class DeepPortfolioModel(BasePortfolioModel):
         self._n_assets = batch.n_assets
         self._n_features = batch.features.shape[3]
         self._n_groups = self._resolve_n_groups(batch)
+        self._adjacency_mask = (
+            None
+            if batch.adjacency_mask is None
+            else np.asarray(batch.adjacency_mask, dtype=bool).copy()
+        )
         self._checkpoint_states = artifacts.checkpoint_states
         self._history = artifacts.history
         self._mark_fitted()
@@ -230,7 +242,7 @@ class DeepPortfolioModel(BasePortfolioModel):
         *,
         checkpoint: int | None = None,
     ) -> PortfolioWeightsResult:
-        validate_portfolio_batch(batch)
+        validate_portfolio_prediction_batch(batch, self.config)
         if (
             not self.is_fitted
             or self._model is None
@@ -240,6 +252,7 @@ class DeepPortfolioModel(BasePortfolioModel):
             raise RuntimeError("DeepPortfolioModel must be fitted before predict()")
         if batch.n_assets != self._n_assets or batch.features.shape[3] != self._n_features:
             raise ValueError("prediction batch shape does not match the fitted model")
+        validate_portfolio_identity(batch, self._asset_ids)
 
         device = resolve_device(torch, self.config.device)
         selected_checkpoint = select_checkpoint_epoch(
@@ -251,7 +264,7 @@ class DeepPortfolioModel(BasePortfolioModel):
             n_assets=self._n_assets,
             n_features=self._n_features,
             n_groups=self._n_groups,
-            adjacency_mask=adjacency_mask_tensor(batch, device),
+            adjacency_mask=self._prediction_adjacency_mask(batch, device),
             config=self.config,
         ).to(device)
         model.load_state_dict(deepcopy(self._checkpoint_states[selected_checkpoint]))
@@ -283,3 +296,23 @@ class DeepPortfolioModel(BasePortfolioModel):
         if not self.config.use_group_embedding or batch.group_ids is None:
             return None
         return int(np.max(np.asarray(batch.group_ids, dtype=np.int64))) + 1
+
+    def _prediction_adjacency_mask(
+        self,
+        batch: PortfolioSequenceBatch,
+        device: torch.device,
+    ) -> torch.Tensor | None:
+        if batch.adjacency_mask is not None and not _same_optional_array(
+            batch.adjacency_mask,
+            self._adjacency_mask,
+        ):
+            raise ValueError("prediction adjacency_mask must match the fitted adjacency_mask")
+        if self._adjacency_mask is None:
+            return None
+        return torch.as_tensor(self._adjacency_mask, dtype=torch.bool, device=device)
+
+
+def _same_optional_array(left: object | None, right: object | None) -> bool:
+    if left is None or right is None:
+        return left is right
+    return bool(np.array_equal(np.asarray(left), np.asarray(right)))

@@ -24,6 +24,7 @@ class LatentFactorModel(Protocol):
     """Protocol for structural latent-factor estimators."""
 
     is_fitted: bool
+    available_checkpoints: tuple[int, ...]
 
     def fit(self, batch: PanelBatch) -> FitSummary: ...
 
@@ -59,6 +60,7 @@ class PortfolioModel(Protocol):
     """Protocol for end-to-end portfolio learners."""
 
     is_fitted: bool
+    available_checkpoints: tuple[int, ...]
 
     def fit(
         self,
@@ -89,6 +91,7 @@ class AssetPredictionModel(Protocol):
     """Protocol for direct asset-level predictive models."""
 
     is_fitted: bool
+    available_checkpoints: tuple[int, ...]
 
     def fit(
         self,
@@ -109,6 +112,7 @@ class StochasticDiscountFactorEstimator(Protocol):
     """Protocol for stochastic discount factor models with weight-native outputs."""
 
     is_fitted: bool
+    available_checkpoints: tuple[tuple[str, int], ...]
 
     def fit(self, batch: CrossSectionBatch) -> FitSummary: ...
 
