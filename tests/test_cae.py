@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+import torch
 
 from ml4t.models import (
     BetaLambdaMapper,
@@ -12,8 +13,6 @@ from ml4t.models import (
     LatentFactorForecastPipeline,
 )
 from ml4t.models._internal import cae_nn
-
-torch = pytest.importorskip("torch")
 
 
 def test_cae_tracks_available_checkpoints_and_supports_checkpointed_extract() -> None:
