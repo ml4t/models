@@ -151,9 +151,10 @@ def mean_cross_sectional_spearman(y_true: np.ndarray, y_score: np.ndarray) -> fl
             continue
         y_rank = average_ranks(y_true[date_idx, valid])
         score_rank = average_ranks(y_score[date_idx, valid])
+        if np.ptp(y_rank) == 0.0 or np.ptp(score_rank) == 0.0:
+            continue
         correlation = np.corrcoef(y_rank, score_rank)[0, 1]
-        if np.isfinite(correlation):
-            correlations.append(float(correlation))
+        correlations.append(float(correlation))
     if not correlations:
         return None
     return float(np.mean(correlations))
