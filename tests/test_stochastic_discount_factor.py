@@ -239,13 +239,5 @@ def test_validation_batch_requires_returns() -> None:
 
 
 def test_stochastic_discount_factor_rejects_non_weight_native_output_mode() -> None:
-    batch = CrossSectionBatch(
-        characteristics=np.zeros((2, 3, 2), dtype=np.float64),
-        returns=np.zeros((2, 3), dtype=np.float64),
-    )
-    model = StochasticDiscountFactorModel(
+    with pytest.raises(TypeError, match="output_mode"):
         StochasticDiscountFactorConfig(output_mode="expected_returns")
-    )
-
-    with pytest.raises(ValueError):
-        model.fit(batch)
