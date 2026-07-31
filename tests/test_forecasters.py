@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Any
+
 import numpy as np
+import pytest
 
 from ml4t.models import (
     AR1FactorForecaster,
     AR1ForecasterConfig,
     EWMABaseFactorForecaster,
     EWMABaseForecasterConfig,
+    ExpandingMeanFactorForecaster,
     LatentFactorState,
 )
 
@@ -53,3 +58,20 @@ def test_ewma_forecaster_broadcasts_last_level() -> None:
 
     assert forecast.factor_premia.shape == (2, 2)
     assert np.allclose(forecast.factor_premia[0], forecast.factor_premia[1])
+
+
+@pytest.mark.parametrize(
+    "forecaster",
+    [
+        AR1FactorForecaster(),
+        EWMABaseFactorForecaster(),
+        ExpandingMeanFactorForecaster(),
+    ],
+)
+def test_forecasters_reject_prediction_and_save_before_fit(forecaster: Any, tmp_path: Path) -> None:
+    state = LatentFactorState(asset_betas=np.ones((2, 2, 1)))
+
+    with pytest.raises(RuntimeError, match="fitted before predict"):
+        forecaster.predict(state)
+    with pytest.raises(RuntimeError, match="fitted before save"):
+        forecaster.save(tmp_path / "forecast.ml4t")

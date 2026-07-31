@@ -69,6 +69,7 @@ def test_resolve_device_cuda_when_available() -> None:
     torch = _FakeTorch(cuda_available=True)
 
     assert resolve_device(torch, "cuda:0").type == "cuda"
+    assert resolve_device(torch, "cuda").type == "cuda"
 
 
 def test_resolve_device_normalizes_cuda_request() -> None:
@@ -84,6 +85,13 @@ def test_resolve_device_rejects_unavailable_cuda() -> None:
         resolve_device(torch, "cuda:0")
 
 
+def test_resolve_device_rejects_out_of_range_cuda_index() -> None:
+    torch = _FakeTorch(cuda_available=True)
+
+    with pytest.raises(RuntimeError, match="CUDA index 1"):
+        resolve_device(torch, "cuda:1")
+
+
 def test_resolve_device_mps_when_available() -> None:
     torch = _FakeTorch(mps_available=True)
 
@@ -97,6 +105,11 @@ def test_resolve_device_rejects_unavailable_mps() -> None:
         resolve_device(torch, "mps")
 
 
+def test_resolve_device_rejects_unknown_device() -> None:
+    with pytest.raises(ValueError, match="requested device"):
+        resolve_device(_FakeTorch(), "tpu")
+
+
 def test_seed_torch_dispatches_by_device() -> None:
     torch = _FakeTorch(cuda_available=True, mps_available=True)
 
@@ -107,3 +120,12 @@ def test_seed_torch_dispatches_by_device() -> None:
     assert torch.seeds == [11, 13, 17]
     assert torch.cuda.seeds == [13]
     assert torch.mps.seeds == [17]
+
+
+def test_seed_torch_allows_mps_without_manual_seed() -> None:
+    torch = _FakeTorch(mps_available=True)
+    torch.mps = object()
+
+    seed_torch(torch, 19, _FakeDevice("mps"))
+
+    assert torch.seeds == [19]
