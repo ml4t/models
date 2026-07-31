@@ -172,6 +172,78 @@ def load_config(
         raise ValueError(f"artifact contains an invalid {config_type.__name__} config") from exc
 
 
+def pack_tensor_tree(value: Any) -> tuple[dict[str, Any], dict[str, np.ndarray]]:
+    arrays: dict[str, np.ndarray] = {}
+
+    def pack(item: Any) -> dict[str, Any]:
+        if isinstance(item, dict):
+            return {
+                "kind": "dict",
+                "items": [[_encode_json(key), pack(child)] for key, child in item.items()],
+            }
+        if isinstance(item, list):
+            return {"kind": "list", "items": [pack(child) for child in item]}
+        if isinstance(item, tuple):
+            return {"kind": "tuple", "items": [pack(child) for child in item]}
+        detach = getattr(item, "detach", None)
+        if not callable(detach):
+            raise TypeError(
+                f"tensor tree leaves must provide detach().cpu().numpy(); got {type(item).__name__}"
+            )
+        array_name = f"tensor_{len(arrays):08d}"
+        arrays[array_name] = np.asarray(detach().cpu().numpy())
+        return {"kind": "tensor", "array": array_name}
+
+    return pack(value), arrays
+
+
+def unpack_tensor_tree(
+    tree: dict[str, Any],
+    arrays: dict[str, np.ndarray],
+    *,
+    torch: Any,
+) -> Any:
+    used_arrays: set[str] = set()
+
+    def unpack(node: Any) -> Any:
+        if not isinstance(node, dict) or not isinstance(node.get("kind"), str):
+            raise ValueError("artifact tensor tree node is invalid")
+        kind = node["kind"]
+        if kind == "tensor":
+            array_name = node.get("array")
+            if not isinstance(array_name, str) or array_name not in arrays:
+                raise ValueError("artifact tensor tree references a missing array")
+            if array_name in used_arrays:
+                raise ValueError(f"artifact tensor tree reuses array {array_name!r}")
+            used_arrays.add(array_name)
+            return torch.from_numpy(arrays[array_name].copy())
+        items = node.get("items")
+        if not isinstance(items, list):
+            raise ValueError(f"artifact tensor tree {kind!r} node must contain items")
+        if kind == "list":
+            return [unpack(child) for child in items]
+        if kind == "tuple":
+            return tuple(unpack(child) for child in items)
+        if kind == "dict":
+            result: dict[Any, Any] = {}
+            for entry in items:
+                if not isinstance(entry, list) or len(entry) != 2:
+                    raise ValueError("artifact tensor tree dict entry is invalid")
+                key = _decode_json(entry[0])
+                if not isinstance(key, str | int | tuple):
+                    raise ValueError("artifact tensor tree dict key has an unsupported type")
+                if key in result:
+                    raise ValueError(f"artifact tensor tree contains duplicate key {key!r}")
+                result[key] = unpack(entry[1])
+            return result
+        raise ValueError(f"artifact tensor tree kind is unsupported: {kind!r}")
+
+    result = unpack(tree)
+    if used_arrays != set(arrays):
+        raise ValueError("artifact tensor tree does not reference every stored array")
+    return result
+
+
 def _prepare_arrays(arrays: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
     prepared: dict[str, np.ndarray] = {}
     for name, values in arrays.items():
@@ -214,6 +286,8 @@ def _encode_json(value: Any) -> Any:
 
 
 def _decode_json(value: Any) -> Any:
+    if isinstance(value, tuple):
+        return tuple(_decode_json(item) for item in value)
     if isinstance(value, dict):
         if set(value) == {"__tuple__"}:
             items = value["__tuple__"]
@@ -223,7 +297,11 @@ def _decode_json(value: Any) -> Any:
         return {key: _decode_json(item) for key, item in value.items()}
     if isinstance(value, list):
         return [_decode_json(item) for item in value]
-    if value is None or isinstance(value, bool | int | float | str):
+    if isinstance(value, float):
+        if not np.isfinite(value):
+            raise ValueError(f"artifact manifest contains non-finite value {value!r}")
+        return value
+    if value is None or isinstance(value, bool | int | str):
         return value
     raise ValueError(f"artifact manifest contains unsupported JSON value {value!r}")
 

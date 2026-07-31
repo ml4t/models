@@ -3,13 +3,21 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Any
+from pathlib import Path
+from typing import Any, cast
 
 import numpy as np
 
 from ml4t.models._internal.latent_factor_utils import (
     resolve_checkpoint_epochs,
     select_checkpoint_epoch,
+)
+from ml4t.models._internal.persistence import (
+    load_artifact,
+    load_config,
+    pack_tensor_tree,
+    save_artifact,
+    unpack_tensor_tree,
 )
 from ml4t.models._internal.torch_runtime import import_torch, resolve_device, seed_torch
 from ml4t.models.asset_prediction.base import BaseAssetPredictionModel
@@ -231,6 +239,43 @@ class SAEModel(BaseAssetPredictionModel[SAEConfig]):
                 "available_checkpoints": self.available_checkpoints,
             },
         )
+
+    def save(self, path: str | Path) -> Path:
+        if not self.is_fitted or self._n_features is None or not self._checkpoint_states:
+            raise RuntimeError("SAE model must be fitted before save()")
+        checkpoint_tree, arrays = pack_tensor_tree(self._checkpoint_states)
+        return save_artifact(
+            path,
+            model_type="ml4t.models.SAEModel",
+            config=self.config,
+            state={
+                "asset_ids": self._asset_ids,
+                "n_features": self._n_features,
+                "history": self._history,
+                "checkpoint_tree": checkpoint_tree,
+            },
+            arrays=arrays,
+        )
+
+    @classmethod
+    def load(cls, path: str | Path, *, device: str | None = None) -> SAEModel:
+        artifact = load_artifact(path, expected_model_type="ml4t.models.SAEModel")
+        model = cls(load_config(artifact, SAEConfig, device=device))
+        checkpoint_tree = artifact.state.get("checkpoint_tree")
+        if not isinstance(checkpoint_tree, dict):
+            raise ValueError("artifact SAE checkpoint tree is invalid")
+        torch = import_torch()
+        model._checkpoint_states = cast(
+            dict[int, dict[str, Any]],
+            unpack_tensor_tree(checkpoint_tree, artifact.arrays, torch=torch),
+        )
+        model._n_features = int(artifact.state["n_features"])
+        model._asset_ids = tuple(artifact.state.get("asset_ids", ()))
+        model._history = tuple(artifact.state.get("history", ()))
+        if not model._checkpoint_states:
+            raise ValueError("artifact SAE has no checkpoints")
+        model._mark_fitted()
+        return model
 
 
 def _flatten_supervision(batch: CrossSectionBatch) -> tuple[np.ndarray, np.ndarray]:
