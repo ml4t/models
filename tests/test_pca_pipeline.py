@@ -87,11 +87,23 @@ def test_pca_rejects_unknown_assets_and_checkpoints() -> None:
     model.fit(
         PersistentPanelBatch(
             returns=np.array([[1.0, 1.0], [2.0, 1.0], [3.0, 2.0]]),
-            asset_ids=("A", "B"),
+            asset_ids=("SECRET_ASSET_A", "SECRET_ASSET_B"),
         )
     )
 
-    with pytest.raises(ValueError, match="asset_ids"):
-        model.extract(PersistentPanelBatch(timestamps=("t",), asset_ids=("A", "C")))
+    with pytest.raises(ValueError, match="asset_ids") as exc_info:
+        model.extract(
+            PersistentPanelBatch(
+                timestamps=("t",),
+                asset_ids=("SECRET_ASSET_A", "SECRET_ASSET_C"),
+            )
+        )
+    assert "SECRET" not in str(exc_info.value)
     with pytest.raises(ValueError, match="checkpoints"):
-        model.extract(PersistentPanelBatch(timestamps=("t",), asset_ids=("A", "B")), checkpoint=1)
+        model.extract(
+            PersistentPanelBatch(
+                timestamps=("t",),
+                asset_ids=("SECRET_ASSET_A", "SECRET_ASSET_B"),
+            ),
+            checkpoint=1,
+        )

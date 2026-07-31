@@ -101,7 +101,10 @@ class LinearFeaturePortfolioModel(BasePortfolioModel):
         if checkpoint is not None and checkpoint != 1:
             raise ValueError("LinearFeaturePortfolioModel only exposes checkpoint=1")
         if batch.features.shape[3] != self._n_features:
-            raise ValueError("prediction batch feature dimension does not match the fitted model")
+            raise ValueError(
+                "prediction batch feature dimension does not match the fitted model: "
+                f"expected {self._n_features}, got {batch.features.shape[3]}"
+            )
 
         features = np.asarray(batch.features, dtype=np.dtype(self.config.dtype))
         mask = (

@@ -17,9 +17,15 @@ class BetaLambdaMapper(BaseAssetMapper):
         factor_forecast: FactorForecastResult,
     ) -> AssetForecastResult:
         if state.n_periods != factor_forecast.factor_premia.shape[0]:
-            raise ValueError("State and factor forecast disagree on T")
+            raise ValueError(
+                "state and factor forecast disagree on T: "
+                f"expected {state.n_periods}, got {factor_forecast.factor_premia.shape[0]}"
+            )
         if state.n_factors != factor_forecast.factor_premia.shape[1]:
-            raise ValueError("State and factor forecast disagree on K")
+            raise ValueError(
+                "state and factor forecast disagree on K: "
+                f"expected {state.n_factors}, got {factor_forecast.factor_premia.shape[1]}"
+            )
 
         expected_returns = np.einsum(
             "tnk,tk->tn",

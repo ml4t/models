@@ -99,9 +99,14 @@ class PersistentPanelBatch:
             asset_ids=self.asset_ids,
         )
         if characteristics is not None and characteristics.shape[:2] != (n_periods, n_assets):
-            raise ValueError("characteristics and returns disagree on (T, N)")
+            raise ValueError(
+                "characteristics and returns disagree on (T, N): "
+                f"expected {(n_periods, n_assets)}, got {characteristics.shape[:2]}"
+            )
         if self.timestamps and len(self.timestamps) != n_periods:
-            raise ValueError("timestamps length does not match number of periods")
+            raise ValueError(
+                f"timestamps length mismatch: expected {n_periods}, got {len(self.timestamps)}"
+            )
         _validate_asset_ids(self.asset_ids, n_assets)
 
     @property
@@ -153,16 +158,30 @@ class CrossSectionBatch:
 
         n_periods, n_slots = characteristics.shape[:2]
         if returns is not None and returns.shape != (n_periods, n_slots):
-            raise ValueError("returns and characteristics disagree on (T, N)")
+            raise ValueError(
+                "returns and characteristics disagree on (T, N): "
+                f"expected {(n_periods, n_slots)}, got {returns.shape}"
+            )
         if factor_returns is not None and factor_returns.shape != (n_periods, n_slots):
-            raise ValueError("factor_returns and characteristics disagree on (T, N)")
+            raise ValueError(
+                "factor_returns and characteristics disagree on (T, N): "
+                f"expected {(n_periods, n_slots)}, got {factor_returns.shape}"
+            )
         if context_features is not None and context_features.shape[0] != n_periods:
-            raise ValueError("context_features and characteristics disagree on T")
+            raise ValueError(
+                "context_features and characteristics disagree on T: "
+                f"expected {n_periods}, got {context_features.shape[0]}"
+            )
         if self.timestamps and len(self.timestamps) != n_periods:
-            raise ValueError("timestamps length does not match number of periods")
+            raise ValueError(
+                f"timestamps length mismatch: expected {n_periods}, got {len(self.timestamps)}"
+            )
         _validate_asset_ids(self.asset_ids, n_slots)
         if self.mask is not None and np.asarray(self.mask).shape != (n_periods, n_slots):
-            raise ValueError("mask must match (T, N)")
+            raise ValueError(
+                f"mask must match (T, N): expected {(n_periods, n_slots)}, "
+                f"got {np.asarray(self.mask).shape}"
+            )
 
     @property
     def n_periods(self) -> int:
@@ -202,30 +221,52 @@ class PortfolioSequenceBatch:
 
         batch_size, n_periods, n_assets, _ = features.shape
         if returns is not None and returns.shape[:2] != features.shape[:2]:
-            raise ValueError("returns and features disagree on (B, T)")
+            raise ValueError(
+                "returns and features disagree on (B, T): "
+                f"expected {features.shape[:2]}, got {returns.shape[:2]}"
+            )
         if returns is not None and returns.shape[2] != n_assets:
-            raise ValueError("returns and features disagree on N")
+            raise ValueError(
+                f"returns and features disagree on N: expected {n_assets}, got {returns.shape[2]}"
+            )
         if vol_scale is not None and vol_scale.shape != features.shape[:3]:
-            raise ValueError("vol_scale and features disagree on (B, T, N)")
+            raise ValueError(
+                "vol_scale and features disagree on (B, T, N): "
+                f"expected {features.shape[:3]}, got {vol_scale.shape}"
+            )
         if prev_weights is not None and prev_weights.shape != (batch_size, n_assets):
-            raise ValueError("prev_weights must have shape (B, N)")
+            raise ValueError(
+                f"prev_weights must have shape (B, N): expected {(batch_size, n_assets)}, "
+                f"got {prev_weights.shape}"
+            )
         if self.mask is not None and np.asarray(self.mask).shape != features.shape[:3]:
-            raise ValueError("mask must match (B, T, N)")
+            raise ValueError(
+                f"mask must match (B, T, N): expected {features.shape[:3]}, "
+                f"got {np.asarray(self.mask).shape}"
+            )
         if self.group_ids is not None and np.asarray(self.group_ids).shape != (n_assets,):
-            raise ValueError("group_ids must have shape (N,)")
+            raise ValueError(
+                f"group_ids must have shape (N,): expected {(n_assets,)}, "
+                f"got {np.asarray(self.group_ids).shape}"
+            )
         costs = None
         if self.costs is not None:
             costs = np.asarray(self.costs, dtype=np.float64)
             if costs.ndim == 1:
                 costs = costs[:, None]
             if costs.ndim != 2 or costs.shape != (n_assets, 1):
-                raise ValueError("costs must have shape (N,) or (N, 1)")
+                raise ValueError(
+                    f"costs must have shape (N,) or (N, 1) for N={n_assets}; got {costs.shape}"
+                )
         object.__setattr__(self, "costs", costs)
         if self.adjacency_mask is not None and np.asarray(self.adjacency_mask).shape != (
             n_assets,
             n_assets,
         ):
-            raise ValueError("adjacency_mask must have shape (N, N)")
+            raise ValueError(
+                f"adjacency_mask must have shape (N, N): expected {(n_assets, n_assets)}, "
+                f"got {np.asarray(self.adjacency_mask).shape}"
+            )
         _validate_asset_ids(self.asset_ids, n_assets)
         if self.timestamps and len(self.timestamps) != n_periods:
             raise ValueError(
@@ -313,9 +354,14 @@ class LatentFactorState:
 
         n_periods, n_assets, n_factors = asset_betas.shape
         if factor_returns is not None and factor_returns.shape != (n_periods, n_factors):
-            raise ValueError("factor_returns must have shape (T, K)")
+            raise ValueError(
+                f"factor_returns must have shape (T, K): expected {(n_periods, n_factors)}, "
+                f"got {factor_returns.shape}"
+            )
         if self.timestamps and len(self.timestamps) != n_periods:
-            raise ValueError("timestamps length does not match T")
+            raise ValueError(
+                f"timestamps length mismatch: expected {n_periods}, got {len(self.timestamps)}"
+            )
         _validate_asset_ids(self.asset_ids, n_assets)
 
     @property
@@ -344,7 +390,10 @@ class FactorForecastResult:
         assert factor_premia is not None
         object.__setattr__(self, "factor_premia", factor_premia)
         if self.timestamps and len(self.timestamps) != factor_premia.shape[0]:
-            raise ValueError("timestamps length does not match T")
+            raise ValueError(
+                "timestamps length mismatch: "
+                f"expected {factor_premia.shape[0]}, got {len(self.timestamps)}"
+            )
 
 
 @dataclass(slots=True, frozen=True)
@@ -366,7 +415,9 @@ class AssetForecastResult:
         object.__setattr__(self, "expected_returns", expected_returns)
         n_periods, n_assets = expected_returns.shape
         if self.timestamps and len(self.timestamps) != n_periods:
-            raise ValueError("timestamps length does not match T")
+            raise ValueError(
+                f"timestamps length mismatch: expected {n_periods}, got {len(self.timestamps)}"
+            )
         _validate_asset_ids(self.asset_ids, n_assets)
 
 
@@ -389,7 +440,9 @@ class AssetSignalResult:
         object.__setattr__(self, "signal_values", signal_values)
         n_periods, n_assets = signal_values.shape
         if self.timestamps and len(self.timestamps) != n_periods:
-            raise ValueError("timestamps length does not match T")
+            raise ValueError(
+                f"timestamps length mismatch: expected {n_periods}, got {len(self.timestamps)}"
+            )
         _validate_asset_ids(self.asset_ids, n_assets)
 
 
@@ -408,7 +461,9 @@ class AssetWeightsResult:
         object.__setattr__(self, "weights", weights)
         n_periods, n_assets = weights.shape
         if self.timestamps and len(self.timestamps) != n_periods:
-            raise ValueError("timestamps length does not match T")
+            raise ValueError(
+                f"timestamps length mismatch: expected {n_periods}, got {len(self.timestamps)}"
+            )
         _validate_asset_ids(self.asset_ids, n_assets)
 
 
@@ -431,9 +486,13 @@ class StochasticDiscountFactorState:
         object.__setattr__(self, "sdf_values", sdf_values)
         n_periods, n_assets = asset_weights.shape
         if sdf_values is not None and sdf_values.shape != (n_periods,):
-            raise ValueError("sdf_values must have shape (T,)")
+            raise ValueError(
+                f"sdf_values must have shape (T,): expected {(n_periods,)}, got {sdf_values.shape}"
+            )
         if self.timestamps and len(self.timestamps) != n_periods:
-            raise ValueError("timestamps length does not match T")
+            raise ValueError(
+                f"timestamps length mismatch: expected {n_periods}, got {len(self.timestamps)}"
+            )
         _validate_asset_ids(self.asset_ids, n_assets)
 
     @property
@@ -461,7 +520,9 @@ class PortfolioWeightsResult:
         object.__setattr__(self, "weights", weights)
         _, n_periods, n_assets = weights.shape
         if self.timestamps and len(self.timestamps) != n_periods:
-            raise ValueError("timestamps length does not match T")
+            raise ValueError(
+                f"timestamps length mismatch: expected {n_periods}, got {len(self.timestamps)}"
+            )
         _validate_asset_ids(self.asset_ids, n_assets)
 
 

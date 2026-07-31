@@ -213,13 +213,26 @@ class DeepPortfolioModel(BasePortfolioModel):
         validation_batch = validation_batch or batch
         validate_portfolio_training_batch(validation_batch, self.config)
         if batch.n_assets != validation_batch.n_assets:
-            raise ValueError("train and validation batches must share the asset dimension")
+            raise ValueError(
+                "train and validation batches must share the asset dimension: "
+                f"expected {batch.n_assets}, got {validation_batch.n_assets}"
+            )
         if batch.features.shape[3] != validation_batch.features.shape[3]:
-            raise ValueError("train and validation batches must share the feature dimension")
+            raise ValueError(
+                "train and validation batches must share the feature dimension: "
+                f"expected {batch.features.shape[3]}, got {validation_batch.features.shape[3]}"
+            )
         if batch.asset_ids != validation_batch.asset_ids:
-            raise ValueError("train and validation batches must share asset_ids")
+            raise ValueError(
+                "train and validation batches must share asset_ids in the same order; "
+                f"expected {len(batch.asset_ids)} identifiers, got "
+                f"{len(validation_batch.asset_ids)} identifiers with different identity or order"
+            )
         if not _same_optional_array(batch.adjacency_mask, validation_batch.adjacency_mask):
-            raise ValueError("train and validation batches must share adjacency_mask")
+            raise ValueError(
+                "train and validation batches must share adjacency_mask; "
+                "the observed validation topology differs from the fitted training topology"
+            )
 
         device = resolve_device(torch, self.config.device)
         dtype = resolve_dtype(torch, self.config.dtype)
@@ -271,8 +284,16 @@ class DeepPortfolioModel(BasePortfolioModel):
         validate_portfolio_prediction_batch(batch, self.config)
         if not self.is_fitted or self._n_assets is None or self._n_features is None:
             raise RuntimeError("DeepPortfolioModel must be fitted before predict()")
-        if batch.n_assets != self._n_assets or batch.features.shape[3] != self._n_features:
-            raise ValueError("prediction batch shape does not match the fitted model")
+        if batch.n_assets != self._n_assets:
+            raise ValueError(
+                "prediction batch asset dimension does not match the fitted model: "
+                f"expected {self._n_assets}, got {batch.n_assets}"
+            )
+        if batch.features.shape[3] != self._n_features:
+            raise ValueError(
+                "prediction batch feature dimension does not match the fitted model: "
+                f"expected {self._n_features}, got {batch.features.shape[3]}"
+            )
         validate_portfolio_identity(batch, self._asset_ids)
 
         device = resolve_device(torch, self.config.device)
@@ -328,7 +349,10 @@ class DeepPortfolioModel(BasePortfolioModel):
             batch.adjacency_mask,
             self._adjacency_mask,
         ):
-            raise ValueError("prediction adjacency_mask must match the fitted adjacency_mask")
+            raise ValueError(
+                "prediction adjacency_mask must match the fitted adjacency_mask; "
+                "omit it to reuse the fitted topology"
+            )
         if self._adjacency_mask is None:
             return None
         return torch.as_tensor(self._adjacency_mask, dtype=torch.bool, device=device)
