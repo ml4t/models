@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from ml4t.models.configs import MapperConfig
+from ml4t.models.configs.pipeline import MapperConfig
 from ml4t.models.types import AssetForecastResult, FactorForecastResult, LatentFactorState
 
 

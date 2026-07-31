@@ -12,7 +12,7 @@ from torch.optim import AdamW
 from ml4t.models._internal.latent_factor_utils import (
     resolve_checkpoint_epochs,
 )
-from ml4t.models.configs import PortfolioConfig
+from ml4t.models.configs.portfolio import PortfolioConfig
 from ml4t.models.portfolio.losses import robust_sharpe_loss
 from ml4t.models.types import PortfolioSequenceBatch
 

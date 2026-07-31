@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ml4t.models.configs import PortfolioConfig
+from ml4t.models.configs.portfolio import PortfolioConfig
 from ml4t.models.types import PortfolioSequenceBatch
 
 

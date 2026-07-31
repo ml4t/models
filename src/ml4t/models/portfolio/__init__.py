@@ -4,16 +4,11 @@ from __future__ import annotations
 
 from importlib import import_module
 
-from ml4t.models.portfolio.base import BasePortfolioModel
-
 __all__ = [
-    "BasePortfolioModel",
     "DeepPortfolioModel",
     "LinearFeaturePortfolioModel",
     "LSTMPortfolioModel",
-    "PortfolioLossOutput",
     "WeightConstraintPostprocessor",
-    "robust_sharpe_loss",
 ]
 
 
@@ -25,8 +20,6 @@ def __getattr__(name: str):
             "LinearFeaturePortfolioModel",
         ),
         "LSTMPortfolioModel": ("ml4t.models.portfolio.lstm", "LSTMPortfolioModel"),
-        "PortfolioLossOutput": ("ml4t.models.portfolio.losses", "PortfolioLossOutput"),
-        "robust_sharpe_loss": ("ml4t.models.portfolio.losses", "robust_sharpe_loss"),
         "WeightConstraintPostprocessor": (
             "ml4t.models.portfolio.postprocessors",
             "WeightConstraintPostprocessor",

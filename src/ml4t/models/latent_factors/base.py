@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 
 from ml4t.models.api import PanelBatch
-from ml4t.models.configs import LatentFactorConfig
+from ml4t.models.configs.latent_factor import LatentFactorConfig
 from ml4t.models.types import FitSummary, LatentFactorState
 
 

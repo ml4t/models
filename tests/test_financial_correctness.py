@@ -5,13 +5,14 @@ import pytest
 import torch
 from torch import nn
 
-from ml4t.models import PortfolioConfig, PortfolioSequenceBatch, RPPCAConfig
+from ml4t.models import PortfolioSequenceBatch, RPPCAConfig
 from ml4t.models._internal.latent_factor_utils import compute_managed_portfolios
 from ml4t.models._internal.stochastic_discount_factor_nn import (
     conditional_loss,
     construct_stochastic_discount_factor,
     unconditional_loss,
 )
+from ml4t.models.configs.portfolio import PortfolioConfig
 from ml4t.models.latent_factors.ipca import _normalize_theta_y
 from ml4t.models.latent_factors.rp_pca import _risk_premium_matrix
 from ml4t.models.portfolio import runtime as portfolio_runtime
