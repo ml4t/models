@@ -232,3 +232,88 @@ def test_portfolio_allocation_pipeline_applies_weight_constraints() -> None:
     processed_gross = np.abs(prediction.processed_weights.weights).sum(axis=-1)
     assert np.all(processed_gross <= 0.8 + 1e-8)
     assert np.all(np.abs(prediction.processed_weights.weights) <= 0.35 + 1e-8)
+
+
+@pytest.mark.parametrize(
+    "model",
+    [
+        LSTMPortfolioModel(
+            LSTMPortfolioConfig(
+                hidden_size=4,
+                max_iters=1,
+                eval_every=1,
+                checkpoint_every=1,
+                default_checkpoint=1,
+            )
+        ),
+        DeepPortfolioModel(
+            DeepPortfolioConfig(
+                d_model=4,
+                n_heads=1,
+                temporal_mha_layers=1,
+                cross_attention_heads=1,
+                macro_gnn_heads=1,
+                max_iters=1,
+                eval_every=1,
+                checkpoint_every=1,
+                default_checkpoint=1,
+            )
+        ),
+    ],
+)
+def test_neural_portfolio_quickstart_fits_and_predicts_unlabeled_future(model: object) -> None:
+    rng = np.random.default_rng(53)
+    train = PortfolioSequenceBatch(
+        features=rng.normal(size=(2, 3, 2, 2)),
+        returns=rng.normal(size=(2, 3, 2)),
+        timestamps=("t1", "t2", "t3"),
+        asset_ids=("A", "B"),
+    )
+    future = PortfolioSequenceBatch(
+        features=rng.normal(size=(1, 2, 2, 2)),
+        timestamps=("t4", "t5"),
+        asset_ids=("A", "B"),
+    )
+
+    fit = model.fit(train)
+    prediction = model.predict(future)
+
+    assert fit.converged
+    assert prediction.weights.shape == (1, 2, 2)
+
+
+def test_deep_portfolio_reuses_fitted_topology_and_rejects_changes() -> None:
+    rng = np.random.default_rng(59)
+    adjacency = np.array([[False, True], [True, False]], dtype=bool)
+    train = PortfolioSequenceBatch(
+        features=rng.normal(size=(2, 3, 2, 2)),
+        returns=rng.normal(size=(2, 3, 2)),
+        adjacency_mask=adjacency,
+        asset_ids=("A", "B"),
+    )
+    model = DeepPortfolioModel(
+        DeepPortfolioConfig(
+            d_model=4,
+            n_heads=1,
+            cross_attention_heads=1,
+            macro_gnn_heads=1,
+            max_iters=1,
+            eval_every=1,
+            checkpoint_every=1,
+        )
+    )
+    model.fit(train)
+
+    omitted = PortfolioSequenceBatch(
+        features=rng.normal(size=(1, 2, 2, 2)),
+        asset_ids=("A", "B"),
+    )
+    model.predict(omitted)
+
+    changed = PortfolioSequenceBatch(
+        features=omitted.features,
+        adjacency_mask=np.zeros((2, 2), dtype=bool),
+        asset_ids=("A", "B"),
+    )
+    with pytest.raises(ValueError, match="adjacency_mask"):
+        model.predict(changed)

@@ -58,21 +58,25 @@ class PCAModel(BaseLatentFactorModel[PCAConfig]):
         *,
         checkpoint: int | None = None,
     ) -> LatentFactorState:
-        del checkpoint
+        if checkpoint is not None:
+            raise ValueError("PCAModel does not expose checkpoints; checkpoint must be None")
         persistent = _require_persistent_panel(batch)
         if not self.is_fitted or self._loadings is None:
             raise RuntimeError("PCA model must be fitted before extract()")
 
+        order = _resolve_asset_order(persistent.asset_ids, self._asset_ids, persistent.n_assets)
+        loadings = self._loadings[order]
         n_periods = persistent.n_periods
         asset_betas = np.broadcast_to(
-            self._loadings[None, :, :],
-            (n_periods, self._loadings.shape[0], self._loadings.shape[1]),
+            loadings[None, :, :],
+            (n_periods, loadings.shape[0], loadings.shape[1]),
         ).copy()
         factor_returns = None
         if persistent.returns is not None and self._asset_mean is not None:
-            centered = np.asarray(persistent.returns, dtype=np.float64) - self._asset_mean[None, :]
+            asset_mean = self._asset_mean[order]
+            centered = np.asarray(persistent.returns, dtype=np.float64) - asset_mean[None, :]
             centered = np.where(np.isfinite(centered), centered, 0.0)
-            factor_returns = centered @ self._loadings
+            factor_returns = centered @ loadings
 
         return LatentFactorState(
             asset_betas=asset_betas,
@@ -91,3 +95,18 @@ def _require_persistent_panel(batch: PanelBatch) -> PersistentPanelBatch:
     if not isinstance(batch, PersistentPanelBatch):
         raise TypeError("PCA requires PersistentPanelBatch input")
     return batch
+
+
+def _resolve_asset_order(
+    requested: tuple[str, ...],
+    fitted: tuple[str, ...],
+    n_assets: int,
+) -> np.ndarray:
+    if not fitted or not requested:
+        return np.arange(len(fitted) if fitted else n_assets, dtype=np.int64)
+    if set(requested) != set(fitted):
+        raise ValueError(
+            f"prediction asset_ids must match fitted asset_ids; expected {fitted}, got {requested}"
+        )
+    fitted_index = {asset: index for index, asset in enumerate(fitted)}
+    return np.asarray([fitted_index[asset] for asset in requested], dtype=np.int64)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from ml4t.models import (
     BetaLambdaMapper,
@@ -64,3 +65,28 @@ def test_pca_extract_uses_training_factor_history_when_returns_are_available() -
 
     assert state.factor_returns is not None
     assert state.factor_returns.shape == (3, 1)
+
+
+def test_pca_reorders_fitted_asset_state_by_identity() -> None:
+    train = PersistentPanelBatch(
+        returns=np.array([[1.0, 2.0], [3.0, 5.0], [4.0, 8.0]], dtype=np.float64),
+        asset_ids=("A", "B"),
+    )
+    model = PCAModel(PCAConfig(n_factors=1))
+    model.fit(train)
+
+    original = model.extract(PersistentPanelBatch(timestamps=("t",), asset_ids=("A", "B")))
+    reordered = model.extract(PersistentPanelBatch(timestamps=("t",), asset_ids=("B", "A")))
+
+    assert np.allclose(reordered.asset_betas[:, 0], original.asset_betas[:, 1])
+    assert np.allclose(reordered.asset_betas[:, 1], original.asset_betas[:, 0])
+
+
+def test_pca_rejects_unknown_assets_and_checkpoints() -> None:
+    model = PCAModel(PCAConfig(n_factors=1))
+    model.fit(PersistentPanelBatch(returns=np.ones((3, 2)), asset_ids=("A", "B")))
+
+    with pytest.raises(ValueError, match="asset_ids"):
+        model.extract(PersistentPanelBatch(timestamps=("t",), asset_ids=("A", "C")))
+    with pytest.raises(ValueError, match="checkpoints"):
+        model.extract(PersistentPanelBatch(timestamps=("t",), asset_ids=("A", "B")), checkpoint=1)

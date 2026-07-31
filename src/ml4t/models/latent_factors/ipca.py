@@ -182,7 +182,8 @@ class IPCAModel(BaseLatentFactorModel[IPCAConfig]):
         *,
         checkpoint: int | None = None,
     ) -> LatentFactorState:
-        del checkpoint
+        if checkpoint is not None:
+            raise ValueError("IPCAModel does not expose checkpoints; checkpoint must be None")
         cross_section = _require_cross_section(batch)
         if not self.is_fitted or self._gamma is None or self._n_features is None:
             raise RuntimeError("IPCA model must be fitted before extract()")

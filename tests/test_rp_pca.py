@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from ml4t.models import PersistentPanelBatch, RPPCAConfig, RPPCAModel
 
@@ -61,3 +62,12 @@ def test_rp_pca_supports_second_moment_parameterization() -> None:
     assert fit.converged
     assert state.factor_returns is not None
     assert np.isfinite(state.factor_returns).all()
+
+
+def test_rp_pca_rejects_unknown_checkpoint() -> None:
+    batch = PersistentPanelBatch(returns=np.eye(3), asset_ids=("A", "B", "C"))
+    model = RPPCAModel(RPPCAConfig(n_factors=1))
+    model.fit(batch)
+
+    with pytest.raises(ValueError, match="checkpoints"):
+        model.extract(batch, checkpoint=1)

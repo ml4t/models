@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from ml4t.models import CrossSectionBatch, IPCAConfig, IPCAModel
 
@@ -107,3 +108,15 @@ def test_ipca_recovers_multi_factor_structure() -> None:
 
     assert fit.converged
     assert mse < 5e-3
+
+
+def test_ipca_rejects_unknown_checkpoint() -> None:
+    batch = CrossSectionBatch(
+        characteristics=np.arange(24, dtype=np.float64).reshape(4, 3, 2),
+        returns=np.arange(12, dtype=np.float64).reshape(4, 3),
+    )
+    model = IPCAModel(IPCAConfig(n_factors=1, max_iter=2))
+    model.fit(batch)
+
+    with pytest.raises(ValueError, match="checkpoints"):
+        model.extract(batch, checkpoint=1)

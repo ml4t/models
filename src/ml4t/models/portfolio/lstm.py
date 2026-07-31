@@ -18,7 +18,9 @@ from ml4t.models.portfolio.runtime import (
     fit_policy_network,
     group_ids_tensor,
     mask_tensor,
-    validate_portfolio_batch,
+    validate_portfolio_identity,
+    validate_portfolio_prediction_batch,
+    validate_portfolio_training_batch,
 )
 from ml4t.models.types import FitSummary, PortfolioSequenceBatch, PortfolioWeightsResult
 
@@ -137,13 +139,15 @@ class LSTMPortfolioModel(BasePortfolioModel):
         *,
         validation_batch: PortfolioSequenceBatch | None = None,
     ) -> FitSummary:
-        validate_portfolio_batch(batch)
+        validate_portfolio_training_batch(batch, self.config)
         validation_batch = validation_batch or batch
-        validate_portfolio_batch(validation_batch)
+        validate_portfolio_training_batch(validation_batch, self.config)
         if batch.n_assets != validation_batch.n_assets:
             raise ValueError("train and validation batches must share the asset dimension")
         if batch.features.shape[3] != validation_batch.features.shape[3]:
             raise ValueError("train and validation batches must share the feature dimension")
+        if batch.asset_ids != validation_batch.asset_ids:
+            raise ValueError("train and validation batches must share asset_ids")
 
         device = resolve_device(torch, self.config.device)
         seed_torch(torch, self.config.seed, device)
@@ -187,7 +191,7 @@ class LSTMPortfolioModel(BasePortfolioModel):
         *,
         checkpoint: int | None = None,
     ) -> PortfolioWeightsResult:
-        validate_portfolio_batch(batch)
+        validate_portfolio_prediction_batch(batch, self.config)
         if (
             not self.is_fitted
             or self._model is None
@@ -197,6 +201,7 @@ class LSTMPortfolioModel(BasePortfolioModel):
             raise RuntimeError("LSTMPortfolioModel must be fitted before predict()")
         if batch.n_assets != self._n_assets or batch.features.shape[3] != self._n_features:
             raise ValueError("prediction batch shape does not match the fitted model")
+        validate_portfolio_identity(batch, self._asset_ids)
 
         device = resolve_device(torch, self.config.device)
         selected_checkpoint = select_checkpoint_epoch(

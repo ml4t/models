@@ -7,7 +7,7 @@ import numpy as np
 from ml4t.models.configs import LinearPortfolioConfig
 from ml4t.models.portfolio.base import BasePortfolioModel
 from ml4t.models.portfolio.postprocessors import normalize_cross_sectional_weights
-from ml4t.models.portfolio.runtime import validate_portfolio_batch
+from ml4t.models.portfolio.runtime import validate_portfolio_training_batch
 from ml4t.models.types import FitSummary, PortfolioSequenceBatch, PortfolioWeightsResult
 
 
@@ -31,7 +31,7 @@ class LinearFeaturePortfolioModel(BasePortfolioModel):
         *,
         validation_batch: PortfolioSequenceBatch | None = None,
     ) -> FitSummary:
-        validate_portfolio_batch(batch)
+        validate_portfolio_training_batch(batch)
         del validation_batch
 
         features = np.asarray(batch.features, dtype=np.float64)
