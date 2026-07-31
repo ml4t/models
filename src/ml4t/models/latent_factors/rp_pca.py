@@ -36,7 +36,8 @@ class RPPCAModel(BaseLatentFactorModel[RPPCAConfig]):
         if persistent.returns is None:
             raise ValueError("RP-PCA requires returns in the training batch")
 
-        returns = np.asarray(persistent.returns, dtype=np.float64)
+        dtype = np.dtype(self.config.dtype)
+        returns = np.asarray(persistent.returns, dtype=dtype)
         returns = np.where(np.isfinite(returns), returns, 0.0)
         n_periods, n_assets = returns.shape
         if self.config.n_factors < 1 or self.config.n_factors > n_assets:
@@ -51,7 +52,7 @@ class RPPCAModel(BaseLatentFactorModel[RPPCAConfig]):
             weighted_returns,
             gamma=self.config.gamma,
             base_moment=self.config.base_moment,
-        )
+        ).astype(dtype, copy=False)
         eigenvalues, eigenvectors = np.linalg.eigh(rp_matrix)
         order = np.argsort(eigenvalues)[::-1]
         eigenvalues = eigenvalues[order][: self.config.n_factors]
@@ -87,10 +88,10 @@ class RPPCAModel(BaseLatentFactorModel[RPPCAConfig]):
 
         asset_betas, alphas, residuals = _time_series_betas(returns, factor_returns)
 
-        self._asset_betas = asset_betas
-        self._factor_weights = factor_weights
-        self._train_factor_returns = factor_returns
-        self._eigenvalues = eigenvalues
+        self._asset_betas = asset_betas.astype(dtype, copy=False)
+        self._factor_weights = factor_weights.astype(dtype, copy=False)
+        self._train_factor_returns = factor_returns.astype(dtype, copy=False)
+        self._eigenvalues = eigenvalues.astype(dtype, copy=False)
         self._asset_ids = persistent.asset_ids
         self._mark_fitted()
 
@@ -122,7 +123,7 @@ class RPPCAModel(BaseLatentFactorModel[RPPCAConfig]):
         factor_weights = self._factor_weights[order]
         factor_returns = None
         if persistent.returns is not None:
-            returns = np.asarray(persistent.returns, dtype=np.float64)
+            returns = np.asarray(persistent.returns, dtype=np.dtype(self.config.dtype))
             returns = np.where(np.isfinite(returns), returns, 0.0)
             factor_returns = returns @ factor_weights
 

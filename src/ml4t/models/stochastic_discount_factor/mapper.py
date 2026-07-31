@@ -21,7 +21,12 @@ from ml4t.models._internal.persistence import (
     save_artifact,
     unpack_tensor_tree,
 )
-from ml4t.models._internal.torch_runtime import import_torch, resolve_device, seed_torch
+from ml4t.models._internal.torch_runtime import (
+    import_torch,
+    resolve_device,
+    resolve_dtype,
+    seed_torch,
+)
 from ml4t.models.configs.latent_factor import StochasticDiscountFactorConfig
 from ml4t.models.configs.pipeline import MapperConfig
 from ml4t.models.types import (
@@ -163,6 +168,7 @@ class StochasticDiscountFactorBetaNetworkHead:
         torch = import_torch()
         nn = _import_stochastic_discount_factor_nn()
         device = resolve_device(torch, self.config.device)
+        dtype = resolve_dtype(torch, self.config.dtype)
         seed_torch(torch, self.config.seed, device)
 
         train_payload = _beta_training_payload(state, batch, scale=None)
@@ -192,7 +198,7 @@ class StochasticDiscountFactorBetaNetworkHead:
             state_dim=self.config.beta_state_dim,
             hidden_dim=self.config.beta_hidden_dim,
             dropout=self.config.dropout,
-        ).to(device)
+        ).to(device=device, dtype=dtype)
         optimizer = torch.optim.Adam(model.parameters(), lr=self.config.beta_lr)
 
         self._checkpoint_states = {}
@@ -277,6 +283,7 @@ class StochasticDiscountFactorBetaNetworkHead:
         torch = import_torch()
         nn = _import_stochastic_discount_factor_nn()
         device = resolve_device(torch, self.config.device)
+        dtype = resolve_dtype(torch, self.config.dtype)
         selected_checkpoint = select_checkpoint_epoch(
             checkpoint=checkpoint,
             configured_default=self.config.beta_default_checkpoint,
@@ -288,22 +295,22 @@ class StochasticDiscountFactorBetaNetworkHead:
             state_dim=self.config.beta_state_dim,
             hidden_dim=self.config.beta_hidden_dim,
             dropout=self.config.dropout,
-        ).to(device)
+        ).to(device=device, dtype=dtype)
         model.load_state_dict(deepcopy(self._checkpoint_states[selected_checkpoint]))
         model.eval()
 
         mask = _resolve_mask(batch)
         payload = {
             "asset_features": torch.as_tensor(
-                np.asarray(batch.characteristics, dtype=np.float32),
-                dtype=torch.float32,
+                batch.characteristics,
+                dtype=dtype,
                 device=device,
             ),
             "context_features": None
             if batch.context_features is None
             else torch.as_tensor(
-                np.asarray(batch.context_features, dtype=np.float32),
-                dtype=torch.float32,
+                batch.context_features,
+                dtype=dtype,
                 device=device,
             ),
             "mask": torch.as_tensor(mask, dtype=torch.bool, device=device),
@@ -406,33 +413,32 @@ def _beta_training_payload(
     device = resolve_device(torch, "cpu")
     del device
     return {
-        "asset_features": np.asarray(batch.characteristics, dtype=np.float32),
+        "asset_features": np.asarray(batch.characteristics, dtype=np.float64),
         "context_features": None
         if batch.context_features is None
-        else np.asarray(batch.context_features, dtype=np.float32),
+        else np.asarray(batch.context_features, dtype=np.float64),
         "mask": mask,
-        "target": y.astype(np.float32),
+        "target": y,
         "scale": scale,
     }
 
 
 def _beta_loss(torch: Any, model: Any, payload: dict[str, Any]) -> Any:
+    dtype = next(model.parameters()).dtype
     asset_features = torch.as_tensor(
-        payload["asset_features"], dtype=torch.float32, device=next(model.parameters()).device
+        payload["asset_features"], dtype=dtype, device=next(model.parameters()).device
     )
     context_features = None
     if payload["context_features"] is not None:
         context_features = torch.as_tensor(
             payload["context_features"],
-            dtype=torch.float32,
+            dtype=dtype,
             device=next(model.parameters()).device,
         )
     mask = torch.as_tensor(
         payload["mask"], dtype=torch.bool, device=next(model.parameters()).device
     )
-    target = torch.as_tensor(
-        payload["target"], dtype=torch.float32, device=next(model.parameters()).device
-    )
+    target = torch.as_tensor(payload["target"], dtype=dtype, device=next(model.parameters()).device)
     pred, _ = model(asset_features, context_features=context_features, mask=mask)
     target_flat = target[mask]
     return torch.mean((pred - target_flat) ** 2)

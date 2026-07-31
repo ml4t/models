@@ -29,15 +29,16 @@ class AR1FactorForecaster(BaseFactorForecaster[AR1ForecasterConfig]):
         self._fallback_mean: np.ndarray | None = None
 
     def fit(self, state: LatentFactorState) -> FitSummary:
-        factors = require_estimable_factor_returns(state)
+        dtype = np.dtype(self.config.dtype)
+        factors = require_estimable_factor_returns(state).astype(dtype, copy=False)
         n_periods, n_factors = factors.shape
         fallback_mean = np.nanmean(factors, axis=0)
         last_values = np.asarray(
             [factor[np.isfinite(factor)][-1] for factor in factors.T],
-            dtype=np.float64,
+            dtype=dtype,
         )
-        intercepts = np.zeros(n_factors, dtype=np.float64)
-        slopes = np.zeros(n_factors, dtype=np.float64)
+        intercepts = np.zeros(n_factors, dtype=dtype)
+        slopes = np.zeros(n_factors, dtype=dtype)
 
         if n_periods < 2:
             intercepts = fallback_mean.copy()
@@ -61,7 +62,7 @@ class AR1FactorForecaster(BaseFactorForecaster[AR1ForecasterConfig]):
             if valid.sum() < 2:
                 intercepts[factor_idx] = fallback_mean[factor_idx]
                 continue
-            design = np.column_stack([np.ones(valid.sum(), dtype=np.float64), x_k[valid]])
+            design = np.column_stack([np.ones(valid.sum(), dtype=dtype), x_k[valid]])
             coeffs, *_ = np.linalg.lstsq(design, y_k[valid], rcond=None)
             intercepts[factor_idx], slopes[factor_idx] = coeffs
 
@@ -89,7 +90,9 @@ class AR1FactorForecaster(BaseFactorForecaster[AR1ForecasterConfig]):
         assert self._fallback_mean is not None
 
         n_periods = state.n_periods
-        forecasts = np.zeros((n_periods, self._intercepts.shape[0]), dtype=np.float64)
+        forecasts = np.zeros(
+            (n_periods, self._intercepts.shape[0]), dtype=np.dtype(self.config.dtype)
+        )
         previous = self._last_values.copy()
         for step in range(n_periods):
             next_values = self._intercepts + self._slopes * previous

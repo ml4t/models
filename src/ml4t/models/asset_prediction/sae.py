@@ -20,7 +20,12 @@ from ml4t.models._internal.persistence import (
     save_artifact,
     unpack_tensor_tree,
 )
-from ml4t.models._internal.torch_runtime import import_torch, resolve_device, seed_torch
+from ml4t.models._internal.torch_runtime import (
+    import_torch,
+    resolve_device,
+    resolve_dtype,
+    seed_torch,
+)
 from ml4t.models.asset_prediction.base import BaseAssetPredictionModel
 from ml4t.models.configs import SAEConfig
 from ml4t.models.types import AssetSignalResult, CrossSectionBatch, FitSummary
@@ -59,6 +64,7 @@ class SAEModel(BaseAssetPredictionModel[SAEConfig]):
         torch = import_torch()
         nn = _import_sae_nn()
         device = resolve_device(torch, self.config.device)
+        dtype = resolve_dtype(torch, self.config.dtype)
         seed_torch(torch, self.config.seed, device)
 
         checkpoint_epochs = tuple(
@@ -75,14 +81,14 @@ class SAEModel(BaseAssetPredictionModel[SAEConfig]):
             dropout_rates=_resolve_dropout_rates(self.config.dropout_rates),
             noise_std=self.config.noise_std,
             output_activation="sigmoid" if self.config.task_type == "classification" else "linear",
-        ).to(device)
+        ).to(device=device, dtype=dtype)
         optimizer = torch.optim.Adam(model.parameters(), lr=self.config.lr)
 
         train_features, train_targets = _flatten_supervision(batch)
         if train_features.shape[0] == 0:
             raise ValueError("SAE training received no valid observations")
-        train_features_t = torch.as_tensor(train_features, dtype=torch.float32, device=device)
-        train_targets_t = torch.as_tensor(train_targets, dtype=torch.float32, device=device)
+        train_features_t = torch.as_tensor(train_features, dtype=dtype, device=device)
+        train_targets_t = torch.as_tensor(train_targets, dtype=dtype, device=device)
 
         val_features_t = None
         val_targets_t = None
@@ -91,8 +97,8 @@ class SAEModel(BaseAssetPredictionModel[SAEConfig]):
                 raise ValueError("validation_batch must include returns")
             val_features, val_targets = _flatten_supervision(validation_batch)
             if val_features.shape[0] > 0:
-                val_features_t = torch.as_tensor(val_features, dtype=torch.float32, device=device)
-                val_targets_t = torch.as_tensor(val_targets, dtype=torch.float32, device=device)
+                val_features_t = torch.as_tensor(val_features, dtype=dtype, device=device)
+                val_targets_t = torch.as_tensor(val_targets, dtype=dtype, device=device)
 
         self._checkpoint_states = {}
         history: list[dict[str, float | str]] = []
@@ -204,6 +210,7 @@ class SAEModel(BaseAssetPredictionModel[SAEConfig]):
         torch = import_torch()
         nn = _import_sae_nn()
         device = resolve_device(torch, self.config.device)
+        dtype = resolve_dtype(torch, self.config.dtype)
         selected_checkpoint = select_checkpoint_epoch(
             checkpoint=checkpoint,
             configured_default=self.config.default_checkpoint,
@@ -216,7 +223,7 @@ class SAEModel(BaseAssetPredictionModel[SAEConfig]):
             dropout_rates=_resolve_dropout_rates(self.config.dropout_rates),
             noise_std=self.config.noise_std,
             output_activation="sigmoid" if self.config.task_type == "classification" else "linear",
-        ).to(device)
+        ).to(device=device, dtype=dtype)
         model.load_state_dict(deepcopy(self._checkpoint_states[selected_checkpoint]))
         model.eval()
 
@@ -228,8 +235,8 @@ class SAEModel(BaseAssetPredictionModel[SAEConfig]):
                 if not valid.any():
                     continue
                 features_t = torch.as_tensor(
-                    np.asarray(batch.characteristics[date_idx, valid], dtype=np.float32),
-                    dtype=torch.float32,
+                    batch.characteristics[date_idx, valid],
+                    dtype=dtype,
                     device=device,
                 )
                 predictions_t = model.predict(features_t).squeeze(-1).detach().cpu().numpy()

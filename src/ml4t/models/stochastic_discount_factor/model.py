@@ -20,7 +20,12 @@ from ml4t.models._internal.persistence import (
     save_artifact,
     unpack_tensor_tree,
 )
-from ml4t.models._internal.torch_runtime import import_torch, resolve_device, seed_torch
+from ml4t.models._internal.torch_runtime import (
+    import_torch,
+    resolve_device,
+    resolve_dtype,
+    seed_torch,
+)
 from ml4t.models.configs import StochasticDiscountFactorConfig
 from ml4t.models.stochastic_discount_factor.base import BaseStochasticDiscountFactorModel
 from ml4t.models.types import CrossSectionBatch, FitSummary, StochasticDiscountFactorState
@@ -79,8 +84,9 @@ class StochasticDiscountFactorModel(BaseStochasticDiscountFactorModel):
         torch = import_torch()
         nn = _import_stochastic_discount_factor_nn()
         device = resolve_device(torch, self.config.device)
+        dtype = resolve_dtype(torch, self.config.dtype)
 
-        returns_raw = torch.as_tensor(np.asarray(batch.returns, dtype=np.float32), device=device)
+        returns_raw = torch.as_tensor(batch.returns, dtype=dtype, device=device)
         mask = _resolve_mask(batch, torch, device)
         returns = torch.where(mask, returns_raw, torch.zeros_like(returns_raw))
         n_obs_per_asset = mask.float().sum(dim=0)
@@ -88,15 +94,15 @@ class StochasticDiscountFactorModel(BaseStochasticDiscountFactorModel):
             raise ValueError("Stochastic discount factor training received no valid observations")
 
         asset_features = torch.as_tensor(
-            np.asarray(batch.characteristics, dtype=np.float32),
-            dtype=torch.float32,
+            batch.characteristics,
+            dtype=dtype,
             device=device,
         )
         context_features = None
         if batch.context_features is not None:
             context_features = torch.as_tensor(
-                np.asarray(batch.context_features, dtype=np.float32),
-                dtype=torch.float32,
+                batch.context_features,
+                dtype=dtype,
                 device=device,
             )
 
@@ -110,14 +116,14 @@ class StochasticDiscountFactorModel(BaseStochasticDiscountFactorModel):
             state_dim=self.config.state_dim_sdf,
             hidden_dim=self.config.hidden_dim,
             dropout=self.config.dropout,
-        ).to(device)
+        ).to(device=device, dtype=dtype)
         moment_net = nn.MomentNetwork(
             n_asset_features=batch.characteristics.shape[2],
             n_context_features=0 if context_features is None else context_features.shape[1],
             n_instruments=self.config.n_instruments,
             state_dim=self.config.state_dim_moment,
             dropout=self.config.dropout,
-        ).to(device)
+        ).to(device=device, dtype=dtype)
 
         sdf_optimizer = torch.optim.Adam(
             stochastic_discount_factor_net.parameters(),
@@ -141,7 +147,7 @@ class StochasticDiscountFactorModel(BaseStochasticDiscountFactorModel):
         history: list[dict[str, float | str]] = []
 
         val_tensors = (
-            _prepare_sdf_tensors(validation_batch, torch, device)
+            _prepare_sdf_tensors(validation_batch, torch, device, dtype=dtype)
             if validation_batch is not None
             else None
         )
@@ -345,6 +351,7 @@ class StochasticDiscountFactorModel(BaseStochasticDiscountFactorModel):
         torch = import_torch()
         nn = _import_stochastic_discount_factor_nn()
         device = resolve_device(torch, self.config.device)
+        dtype = resolve_dtype(torch, self.config.dtype)
         selected_checkpoint = _select_checkpoint(
             checkpoint=checkpoint,
             configured_default=self.config.default_checkpoint,
@@ -359,22 +366,22 @@ class StochasticDiscountFactorModel(BaseStochasticDiscountFactorModel):
             state_dim=self.config.state_dim_sdf,
             hidden_dim=self.config.hidden_dim,
             dropout=self.config.dropout,
-        ).to(device)
+        ).to(device=device, dtype=dtype)
         stochastic_discount_factor_net.load_state_dict(
             deepcopy(checkpoint_state["stochastic_discount_factor"])
         )
         stochastic_discount_factor_net.eval()
 
         asset_features = torch.as_tensor(
-            np.asarray(batch.characteristics, dtype=np.float32),
-            dtype=torch.float32,
+            batch.characteristics,
+            dtype=dtype,
             device=device,
         )
         context_features = None
         if batch.context_features is not None:
             context_features = torch.as_tensor(
-                np.asarray(batch.context_features, dtype=np.float32),
-                dtype=torch.float32,
+                batch.context_features,
+                dtype=dtype,
                 device=device,
             )
         mask = _resolve_mask(batch, torch, device)
@@ -393,7 +400,7 @@ class StochasticDiscountFactorModel(BaseStochasticDiscountFactorModel):
 
         sdf_values = None
         if batch.returns is not None:
-            returns = torch.as_tensor(np.asarray(batch.returns, dtype=np.float32), device=device)
+            returns = torch.as_tensor(batch.returns, dtype=dtype, device=device)
             returns = torch.where(mask, returns, torch.zeros_like(returns))
             with torch.no_grad():
                 sdf_series = nn.construct_stochastic_discount_factor(returns, weights_flat, mask)
@@ -569,21 +576,24 @@ def _capture_state(
     }
 
 
-def _prepare_sdf_tensors(batch: CrossSectionBatch, torch: Any, device: Any) -> tuple[Any, ...]:
-    returns_raw = torch.as_tensor(np.asarray(batch.returns, dtype=np.float32), device=device)
+def _prepare_sdf_tensors(
+    batch: CrossSectionBatch,
+    torch: Any,
+    device: Any,
+    *,
+    dtype: Any | None = None,
+) -> tuple[Any, ...]:
+    dtype = torch.float32 if dtype is None else dtype
+    returns_raw = torch.as_tensor(batch.returns, dtype=dtype, device=device)
     mask = _resolve_mask(batch, torch, device)
     returns = torch.where(mask, returns_raw, torch.zeros_like(returns_raw))
     n_obs_per_asset = mask.float().sum(dim=0)
     if int(mask.sum().item()) == 0:
         raise ValueError("validation_batch contains no valid SDF validation observations")
-    asset_features = torch.as_tensor(
-        np.asarray(batch.characteristics, dtype=np.float32), dtype=torch.float32, device=device
-    )
+    asset_features = torch.as_tensor(batch.characteristics, dtype=dtype, device=device)
     context_features = None
     if batch.context_features is not None:
-        context_features = torch.as_tensor(
-            np.asarray(batch.context_features, dtype=np.float32), dtype=torch.float32, device=device
-        )
+        context_features = torch.as_tensor(batch.context_features, dtype=dtype, device=device)
     return returns, mask, n_obs_per_asset, asset_features, context_features
 
 

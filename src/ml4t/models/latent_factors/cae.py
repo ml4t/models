@@ -18,7 +18,12 @@ from ml4t.models._internal.persistence import (
     save_artifact,
     unpack_tensor_tree,
 )
-from ml4t.models._internal.torch_runtime import import_torch, resolve_device, seed_torch
+from ml4t.models._internal.torch_runtime import (
+    import_torch,
+    resolve_device,
+    resolve_dtype,
+    seed_torch,
+)
 from ml4t.models.api import PanelBatch
 from ml4t.models.configs import CAEConfig
 from ml4t.models.latent_factors.base import BaseLatentFactorModel
@@ -80,6 +85,7 @@ class CAEModel(BaseLatentFactorModel[CAEConfig]):
         nn = _import_cae_nn()
         checkpoint_epochs = _resolve_training_checkpoints(self.config)
         device = resolve_device(torch, self.config.device)
+        dtype = resolve_dtype(torch, self.config.dtype)
 
         portfolio_returns = _portfolio_returns(cross_section)
         assert portfolio_returns is not None
@@ -89,18 +95,18 @@ class CAEModel(BaseLatentFactorModel[CAEConfig]):
         )
 
         chars_train = torch.as_tensor(
-            np.asarray(cross_section.characteristics, dtype=np.float32),
-            dtype=torch.float32,
+            cross_section.characteristics,
+            dtype=dtype,
             device=device,
         )
         returns_train = torch.as_tensor(
-            np.asarray(cross_section.returns, dtype=np.float32),
-            dtype=torch.float32,
+            cross_section.returns,
+            dtype=dtype,
             device=device,
         )
         portfolios_train = torch.as_tensor(
             managed_portfolios,
-            dtype=torch.float32,
+            dtype=dtype,
             device=device,
         )
         mask_train = _resolve_mask(cross_section)
@@ -127,6 +133,7 @@ class CAEModel(BaseLatentFactorModel[CAEConfig]):
                     returns=validation_portfolio_returns,
                 ),
                 device=device,
+                dtype=dtype,
             )
 
         self._checkpoint_states = defaultdict(list)
@@ -142,7 +149,7 @@ class CAEModel(BaseLatentFactorModel[CAEConfig]):
                 n_instruments=managed_portfolios.shape[2],
                 n_factors=self.config.n_factors,
                 hidden_units=self.config.hidden_units,
-            ).to(device)
+            ).to(device=device, dtype=dtype)
             optimizer = torch.optim.Adam(model.parameters(), lr=self.config.lr)
 
             best_val_loss = float("inf")
@@ -272,6 +279,7 @@ class CAEModel(BaseLatentFactorModel[CAEConfig]):
             available=self.available_checkpoints,
         )
         device = resolve_device(torch, self.config.device)
+        dtype = resolve_dtype(torch, self.config.dtype)
         mask = _resolve_mask(cross_section)
         portfolio_returns = _portfolio_returns(cross_section)
         managed_portfolios = None
@@ -291,7 +299,7 @@ class CAEModel(BaseLatentFactorModel[CAEConfig]):
                 n_instruments=self._n_instruments,
                 n_factors=self.config.n_factors,
                 hidden_units=self.config.hidden_units,
-            ).to(device)
+            ).to(device=device, dtype=dtype)
             model.load_state_dict(deepcopy(state_dict))
             model.eval()
             betas_t, factors_t = _extract_cae_state(
@@ -302,6 +310,7 @@ class CAEModel(BaseLatentFactorModel[CAEConfig]):
                 mask=mask,
                 n_factors=self.config.n_factors,
                 device=device,
+                dtype=dtype,
             )
             ensemble_betas.append(betas_t)
             if factors_t is not None:
@@ -356,6 +365,7 @@ class CAEModel(BaseLatentFactorModel[CAEConfig]):
             available=self.available_checkpoints,
         )
         device = resolve_device(torch, self.config.device)
+        dtype = resolve_dtype(torch, self.config.dtype)
         mask = _resolve_mask(cross_section)
         portfolio_returns = _portfolio_returns(cross_section)
         managed_portfolios = None
@@ -372,7 +382,7 @@ class CAEModel(BaseLatentFactorModel[CAEConfig]):
                 n_instruments=self._n_instruments,
                 n_factors=self.config.n_factors,
                 hidden_units=self.config.hidden_units,
-            ).to(device)
+            ).to(device=device, dtype=dtype)
             model.load_state_dict(deepcopy(state_dict))
             model.eval()
             asset_betas, factor_returns = _extract_cae_state(
@@ -383,6 +393,7 @@ class CAEModel(BaseLatentFactorModel[CAEConfig]):
                 mask=mask,
                 n_factors=self.config.n_factors,
                 device=device,
+                dtype=dtype,
             )
             states.append(
                 LatentFactorState(
@@ -542,26 +553,27 @@ def _prepare_validation_tensors(
     cross_section: CrossSectionBatch,
     managed_portfolios: np.ndarray,
     device: Any,
+    dtype: Any,
 ) -> tuple[Any, Any, Any, Any]:
     assert cross_section.returns is not None
-    returns_np = np.asarray(cross_section.returns, dtype=np.float32)
+    returns_np = np.asarray(cross_section.returns)
     mask_np = _resolve_mask(cross_section)
     if not np.any(mask_np & np.isfinite(returns_np)):
         raise ValueError("validation_batch contains no valid CAE validation observations")
     return (
         torch.as_tensor(
-            np.asarray(cross_section.characteristics, dtype=np.float32),
-            dtype=torch.float32,
+            cross_section.characteristics,
+            dtype=dtype,
             device=device,
         ),
         torch.as_tensor(
-            np.asarray(managed_portfolios, dtype=np.float32),
-            dtype=torch.float32,
+            managed_portfolios,
+            dtype=dtype,
             device=device,
         ),
         torch.as_tensor(
             returns_np,
-            dtype=torch.float32,
+            dtype=dtype,
             device=device,
         ),
         torch.as_tensor(mask_np, dtype=torch.bool, device=device),
@@ -612,6 +624,7 @@ def _extract_cae_state(
     mask: np.ndarray,
     n_factors: int,
     device: Any,
+    dtype: Any,
 ) -> tuple[np.ndarray, np.ndarray | None]:
     asset_betas = np.full(
         (characteristics.shape[0], characteristics.shape[1], n_factors),
@@ -629,7 +642,7 @@ def _extract_cae_state(
                 continue
             features_t = torch.as_tensor(
                 characteristics[date_idx, valid],
-                dtype=torch.float32,
+                dtype=dtype,
                 device=device,
             )
             betas_t = model.get_betas(features_t).detach().cpu().numpy().astype(np.float64)
@@ -639,7 +652,7 @@ def _extract_cae_state(
                 assert factor_returns is not None
                 portfolios_t = torch.as_tensor(
                     managed_portfolios[date_idx, valid][:1],
-                    dtype=torch.float32,
+                    dtype=dtype,
                     device=device,
                 )
                 factor_t = model.get_factors(portfolios_t).squeeze(0)

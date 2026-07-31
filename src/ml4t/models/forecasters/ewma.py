@@ -26,11 +26,12 @@ class EWMABaseFactorForecaster(BaseFactorForecaster[EWMABaseForecasterConfig]):
         self._ewma_level: np.ndarray | None = None
 
     def fit(self, state: LatentFactorState) -> FitSummary:
-        factors = require_estimable_factor_returns(state)
+        dtype = np.dtype(self.config.dtype)
+        factors = require_estimable_factor_returns(state).astype(dtype, copy=False)
         half_life = float(self.config.half_life)
         alpha = 1.0 - np.exp(np.log(0.5) / half_life)
 
-        level = np.zeros(factors.shape[1], dtype=np.float64)
+        level = np.zeros(factors.shape[1], dtype=dtype)
         initialized = np.zeros(factors.shape[1], dtype=bool)
         for row in factors:
             finite = np.isfinite(row)

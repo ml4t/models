@@ -12,6 +12,7 @@ from torch.optim import AdamW
 from ml4t.models._internal.latent_factor_utils import (
     resolve_checkpoint_epochs,
 )
+from ml4t.models._internal.torch_runtime import resolve_dtype
 from ml4t.models.configs.portfolio import PortfolioConfig
 from ml4t.models.portfolio.losses import robust_sharpe_loss
 from ml4t.models.types import PortfolioSequenceBatch
@@ -33,10 +34,11 @@ def fit_policy_network(
     config: PortfolioConfig,
     device: torch.device,
 ) -> PortfolioTrainingArtifacts:
+    dtype = resolve_dtype(torch, config.dtype)
     group_ids_train = group_ids_tensor(batch, device)
-    costs_train = costs_tensor(batch, device)
+    costs_train = costs_tensor(batch, device, dtype=dtype)
     group_ids_val = group_ids_tensor(validation_batch, device)
-    costs_val = costs_tensor(validation_batch, device)
+    costs_val = costs_tensor(validation_batch, device, dtype=dtype)
 
     optimizer = AdamW(
         policy.parameters(),
@@ -59,11 +61,11 @@ def fit_policy_network(
     ema_value: float | None = None
     bad_count = 0
     best_state: dict[str, torch.Tensor] | None = None
-    features = torch.as_tensor(batch.features, dtype=torch.float32, device=device)
-    forward_returns = torch.as_tensor(batch.returns, dtype=torch.float32, device=device)
-    vol_scale = torch.as_tensor(_vol_scale(batch), dtype=torch.float32, device=device)
-    mask = mask_tensor(batch, device)
-    prev_weights = previous_weights_tensor(batch, device)
+    features = torch.as_tensor(batch.features, dtype=dtype, device=device)
+    forward_returns = torch.as_tensor(batch.returns, dtype=dtype, device=device)
+    vol_scale = torch.as_tensor(_vol_scale(batch), dtype=dtype, device=device)
+    mask = mask_tensor(batch, device, dtype=dtype)
+    prev_weights = previous_weights_tensor(batch, device, dtype=dtype)
 
     for step in range(1, config.max_iters + 1):
         policy.train()
@@ -181,10 +183,11 @@ def evaluate_pooled_sharpe(
     device: torch.device,
 ) -> float:
     policy.eval()
-    features = torch.as_tensor(batch.features, dtype=torch.float32, device=device)
-    forward_returns = torch.as_tensor(batch.returns, dtype=torch.float32, device=device)
-    vol_scale = torch.as_tensor(_vol_scale(batch), dtype=torch.float32, device=device)
-    mask = mask_tensor(batch, device)
+    dtype = resolve_dtype(torch, config.dtype)
+    features = torch.as_tensor(batch.features, dtype=dtype, device=device)
+    forward_returns = torch.as_tensor(batch.returns, dtype=dtype, device=device)
+    vol_scale = torch.as_tensor(_vol_scale(batch), dtype=dtype, device=device)
+    mask = mask_tensor(batch, device, dtype=dtype)
     asset_indices = torch.arange(batch.n_assets, dtype=torch.long, device=device)
 
     weights = policy(
@@ -206,19 +209,24 @@ def evaluate_pooled_sharpe(
         eps=config.sharpe_eps,
         tau=config.softmin_tau,
         lambda_soft=config.softmin_lambda,
-        prev_weights=previous_weights_tensor(batch, device),
+        prev_weights=previous_weights_tensor(batch, device, dtype=dtype),
         turnover_penalty=config.turnover_penalty,
     )
     return float(loss_output.sharpe_pool.item())
 
 
-def mask_tensor(batch: PortfolioSequenceBatch, device: torch.device) -> torch.Tensor:
+def mask_tensor(
+    batch: PortfolioSequenceBatch,
+    device: torch.device,
+    *,
+    dtype: torch.dtype = torch.float32,
+) -> torch.Tensor:
     mask = (
         np.asarray(batch.mask, dtype=np.float32)
         if batch.mask is not None
         else np.ones(batch.features.shape[:3], dtype=np.float32)
     )
-    return torch.as_tensor(mask, dtype=torch.float32, device=device)
+    return torch.as_tensor(mask, dtype=dtype, device=device)
 
 
 def group_ids_tensor(batch: PortfolioSequenceBatch, device: torch.device) -> torch.Tensor | None:
@@ -229,19 +237,27 @@ def group_ids_tensor(batch: PortfolioSequenceBatch, device: torch.device) -> tor
     )
 
 
-def costs_tensor(batch: PortfolioSequenceBatch, device: torch.device) -> torch.Tensor | None:
+def costs_tensor(
+    batch: PortfolioSequenceBatch,
+    device: torch.device,
+    *,
+    dtype: torch.dtype = torch.float32,
+) -> torch.Tensor | None:
     if batch.costs is None:
         return None
-    costs = np.asarray(batch.costs, dtype=np.float32)
-    return torch.as_tensor(costs, dtype=torch.float32, device=device)
+    costs = np.asarray(batch.costs)
+    return torch.as_tensor(costs, dtype=dtype, device=device)
 
 
 def previous_weights_tensor(
-    batch: PortfolioSequenceBatch, device: torch.device
+    batch: PortfolioSequenceBatch,
+    device: torch.device,
+    *,
+    dtype: torch.dtype = torch.float32,
 ) -> torch.Tensor | None:
     if batch.prev_weights is None:
         return None
-    return torch.as_tensor(batch.prev_weights, dtype=torch.float32, device=device)
+    return torch.as_tensor(batch.prev_weights, dtype=dtype, device=device)
 
 
 def _vol_scale(batch: PortfolioSequenceBatch) -> np.ndarray:

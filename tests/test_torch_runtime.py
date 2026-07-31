@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from ml4t.models._internal.torch_runtime import resolve_device, seed_torch
+from ml4t.models._internal.torch_runtime import resolve_device, resolve_dtype, seed_torch
 
 
 @dataclass(frozen=True)
@@ -44,6 +44,9 @@ class _FakeMPS:
 
 
 class _FakeTorch:
+    float32 = "fake-float32"
+    float64 = "fake-float64"
+
     def __init__(self, *, cuda_available: bool = False, mps_available: bool = False) -> None:
         self.cuda = _FakeCuda(cuda_available)
         self.backends = type("Backends", (), {"mps": _FakeMPSBackend(mps_available)})()
@@ -108,6 +111,18 @@ def test_resolve_device_rejects_unavailable_mps() -> None:
 def test_resolve_device_rejects_unknown_device() -> None:
     with pytest.raises(ValueError, match="requested device"):
         resolve_device(_FakeTorch(), "tpu")
+
+
+def test_resolve_dtype_maps_supported_precision() -> None:
+    torch = _FakeTorch()
+
+    assert resolve_dtype(torch, "float32") == "fake-float32"
+    assert resolve_dtype(torch, "float64") == "fake-float64"
+
+
+def test_resolve_dtype_rejects_unknown_precision() -> None:
+    with pytest.raises(ValueError, match="requested dtype"):
+        resolve_dtype(_FakeTorch(), "float16")
 
 
 def test_seed_torch_dispatches_by_device() -> None:
