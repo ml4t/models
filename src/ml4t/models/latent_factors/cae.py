@@ -10,6 +10,7 @@ from typing import Any, cast
 import numpy as np
 
 from ml4t.models._internal.latent_factor_utils import select_checkpoint_epoch
+from ml4t.models._internal.lifecycle import atomic_fit
 from ml4t.models._internal.persistence import (
     load_artifact,
     load_config,
@@ -40,6 +41,15 @@ class CAEModel(BaseLatentFactorModel[CAEConfig]):
     def available_checkpoints(self) -> tuple[int, ...]:
         return tuple(sorted(self._checkpoint_states))
 
+    @atomic_fit(
+        "_checkpoint_states",
+        "_asset_ids",
+        "_n_characteristics",
+        "_n_instruments",
+        "_history",
+        "_fit_default_checkpoint",
+        "_is_fitted",
+    )
     def fit(
         self,
         batch: PanelBatch,
@@ -125,7 +135,6 @@ class CAEModel(BaseLatentFactorModel[CAEConfig]):
 
         for ensemble_idx in range(self.config.n_ensemble):
             seed = self.config.seed + ensemble_idx
-            np.random.seed(seed)
             seed_torch(torch, seed, device)
 
             model = nn.ConditionalAutoencoder(

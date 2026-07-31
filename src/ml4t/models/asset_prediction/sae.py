@@ -12,6 +12,7 @@ from ml4t.models._internal.latent_factor_utils import (
     resolve_checkpoint_epochs,
     select_checkpoint_epoch,
 )
+from ml4t.models._internal.lifecycle import atomic_fit
 from ml4t.models._internal.persistence import (
     load_artifact,
     load_config,
@@ -39,6 +40,13 @@ class SAEModel(BaseAssetPredictionModel[SAEConfig]):
     def available_checkpoints(self) -> tuple[int, ...]:
         return tuple(sorted(self._checkpoint_states))
 
+    @atomic_fit(
+        "_checkpoint_states",
+        "_n_features",
+        "_asset_ids",
+        "_history",
+        "_is_fitted",
+    )
     def fit(
         self,
         batch: CrossSectionBatch,
@@ -52,7 +60,6 @@ class SAEModel(BaseAssetPredictionModel[SAEConfig]):
         nn = _import_sae_nn()
         device = resolve_device(torch, self.config.device)
         seed_torch(torch, self.config.seed, device)
-        np.random.seed(self.config.seed)
 
         checkpoint_epochs = tuple(
             resolve_checkpoint_epochs(

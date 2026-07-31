@@ -12,6 +12,7 @@ import numpy as np
 from ml4t.models._internal.latent_factor_utils import (
     resolve_checkpoint_epochs,
 )
+from ml4t.models._internal.lifecycle import atomic_fit
 from ml4t.models._internal.persistence import (
     load_artifact,
     load_config,
@@ -47,6 +48,14 @@ class StochasticDiscountFactorModel(BaseStochasticDiscountFactorModel):
     def available_checkpoints(self) -> tuple[SDFCheckpoint, ...]:
         return tuple(sorted(self._checkpoint_states, key=_checkpoint_sort_key))
 
+    @atomic_fit(
+        "_checkpoint_states",
+        "_asset_ids",
+        "_n_characteristics",
+        "_n_context_features",
+        "_history",
+        "_is_fitted",
+    )
     def fit(
         self,
         batch: CrossSectionBatch,
@@ -94,7 +103,6 @@ class StochasticDiscountFactorModel(BaseStochasticDiscountFactorModel):
         # Seed before network construction so initialization and training are
         # reproducible for a fixed configuration.
         seed_torch(torch, self.config.seed, device)
-        np.random.seed(self.config.seed)
 
         stochastic_discount_factor_net = nn.StochasticDiscountFactorNetwork(
             n_asset_features=batch.characteristics.shape[2],
