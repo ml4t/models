@@ -14,7 +14,7 @@ from ml4t.models._internal.persistence import (
     save_artifact,
 )
 from ml4t.models.configs import AR1ForecasterConfig
-from ml4t.models.forecasters.base import BaseFactorForecaster
+from ml4t.models.forecasters.base import BaseFactorForecaster, require_estimable_factor_returns
 from ml4t.models.types import FactorForecastResult, FitSummary, LatentFactorState
 
 
@@ -29,17 +29,22 @@ class AR1FactorForecaster(BaseFactorForecaster[AR1ForecasterConfig]):
         self._fallback_mean: np.ndarray | None = None
 
     def fit(self, state: LatentFactorState) -> FitSummary:
-        if state.factor_returns is None:
-            raise ValueError("AR1FactorForecaster requires training factor_returns")
-
-        factors = np.asarray(state.factor_returns, dtype=np.float64)
+        factors = require_estimable_factor_returns(state)
         n_periods, n_factors = factors.shape
-        self._fallback_mean = np.nanmean(factors, axis=0)
-        self._last_values = factors[-1].copy()
-        self._intercepts = np.zeros(n_factors, dtype=np.float64)
-        self._slopes = np.zeros(n_factors, dtype=np.float64)
+        fallback_mean = np.nanmean(factors, axis=0)
+        last_values = np.asarray(
+            [factor[np.isfinite(factor)][-1] for factor in factors.T],
+            dtype=np.float64,
+        )
+        intercepts = np.zeros(n_factors, dtype=np.float64)
+        slopes = np.zeros(n_factors, dtype=np.float64)
 
         if n_periods < 2:
+            intercepts = fallback_mean.copy()
+            self._fallback_mean = fallback_mean
+            self._last_values = last_values
+            self._intercepts = intercepts
+            self._slopes = slopes
             self._mark_fitted()
             return FitSummary(
                 converged=True,
@@ -54,13 +59,20 @@ class AR1FactorForecaster(BaseFactorForecaster[AR1ForecasterConfig]):
             y_k = y[:, factor_idx]
             valid = np.isfinite(x_k) & np.isfinite(y_k)
             if valid.sum() < 2:
-                self._intercepts[factor_idx] = self._fallback_mean[factor_idx]
-                self._slopes[factor_idx] = 0.0
+                intercepts[factor_idx] = fallback_mean[factor_idx]
                 continue
             design = np.column_stack([np.ones(valid.sum(), dtype=np.float64), x_k[valid]])
             coeffs, *_ = np.linalg.lstsq(design, y_k[valid], rcond=None)
-            self._intercepts[factor_idx], self._slopes[factor_idx] = coeffs
+            intercepts[factor_idx], slopes[factor_idx] = coeffs
 
+        fitted_values = (intercepts, slopes, last_values, fallback_mean)
+        if not all(np.isfinite(value).all() for value in fitted_values):
+            raise FloatingPointError("AR(1) estimation produced non-finite output")
+
+        self._fallback_mean = fallback_mean
+        self._last_values = last_values
+        self._intercepts = intercepts
+        self._slopes = slopes
         self._mark_fitted()
         return FitSummary(
             converged=True,

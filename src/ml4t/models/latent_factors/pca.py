@@ -35,9 +35,30 @@ class PCAModel(BaseLatentFactorModel[PCAConfig]):
             raise ValueError("PCA requires returns in the training batch")
 
         returns = np.asarray(persistent.returns, dtype=np.float64)
+        n_periods, n_assets = returns.shape
+        max_factors = min(n_periods, n_assets)
+        if self.config.n_factors > max_factors:
+            raise ValueError(
+                f"n_factors={self.config.n_factors} exceeds the panel limit {max_factors} "
+                f"for shape {returns.shape}"
+            )
+        finite = np.isfinite(returns)
+        finite_counts = finite.sum(axis=0)
+        if np.any(finite_counts == 0):
+            missing_assets = np.flatnonzero(finite_counts == 0).tolist()
+            raise ValueError(
+                "PCA requires at least one finite return per asset; "
+                f"assets at positions {missing_assets} have none"
+            )
         asset_mean = np.nanmean(returns, axis=0)
         centered = returns - asset_mean[None, :]
         centered = np.where(np.isfinite(centered), centered, 0.0)
+        rank = int(np.linalg.matrix_rank(centered))
+        if rank < self.config.n_factors:
+            raise ValueError(
+                "PCA requires return variation for every configured factor; "
+                f"centered panel rank={rank}, n_factors={self.config.n_factors}"
+            )
 
         _, _, vt = np.linalg.svd(centered, full_matrices=False)
         loadings = vt[: self.config.n_factors].T
