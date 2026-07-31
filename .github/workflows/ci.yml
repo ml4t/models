@@ -70,7 +70,8 @@ jobs:
       - name: Type-check CI scripts
         run: >-
           uv run ty check scripts/ci/candidate.py scripts/ci/check_coverage.py
-          scripts/ci/test_wheel.py
+          scripts/ci/check_performance.py scripts/ci/hardware_qualification.py
+          scripts/ci/performance_qualification.py scripts/ci/test_wheel.py
 
   coverage:
     name: Coverage
@@ -313,7 +314,7 @@ jobs:
           --mode core
 
   mps-smoke:
-    name: MPS Smoke
+    name: MPS Neural Qualification
     runs-on: macos-15
     needs: build-candidate
     continue-on-error: true
@@ -344,31 +345,97 @@ jobs:
           uv venv .mps-venv --python "${{ steps.setup-python.outputs.python-path }}"
           uv pip install --python .mps-venv/bin/python "${wheel}[all]"
 
-      - name: Verify PyTorch MPS
+      - name: Qualify public neural workflows on MPS
+        run: >-
+          .mps-venv/bin/python scripts/ci/hardware_qualification.py
+          --device mps --output mps-qualification.json
+
+      - name: Upload MPS evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mps-qualification
+          path: mps-qualification.json
+          if-no-files-found: error
+
+  cuda-qualification:
+    name: RTX 3090 CUDA and Performance Qualification
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, linux, x64, cuda, rtx-3090]
+    needs: build-candidate
+    timeout-minutes: 180
+    env:
+      MKL_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        id: setup-python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.13"
+
+      - name: Download candidate
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-candidate
+          path: candidate
+
+      - name: Verify candidate identity
+        run: >-
+          python scripts/ci/candidate.py verify candidate
+          --expected-commit "${{ github.sha }}"
+
+      - name: Install candidate
         run: |
-          .mps-venv/bin/python - <<'PY'
-          import platform
+          wheel="$(find candidate/dist -name '*.whl' -print -quit)"
+          uv venv .cuda-venv --python "${{ steps.setup-python.outputs.python-path }}"
+          uv pip install --python .cuda-venv/bin/python "${wheel}[all]"
 
-          import torch
+      - name: Qualify public neural workflows on CUDA
+        run: >-
+          .cuda-venv/bin/python scripts/ci/hardware_qualification.py
+          --device cuda
+          --expected-cuda-device "NVIDIA GeForce RTX 3090"
+          --expected-cuda-capability 8.6
+          --output cuda-qualification.json
 
-          from ml4t.models._internal.torch_runtime import resolve_device, seed_torch
+      - name: Run repeated Chapter 14 profiles
+        run: |
+          for repetition in 1 2 3; do
+            .cuda-venv/bin/python scripts/ci/performance_qualification.py \
+              --profile canonical \
+              --device cuda \
+              --output "performance-${repetition}.json" \
+              --arrays "performance-${repetition}.npz"
+          done
 
-          assert platform.machine() == "arm64"
-          assert torch.backends.mps.is_built()
-          assert torch.backends.mps.is_available()
+      - name: Check performance and replay limits
+        run: >-
+          .cuda-venv/bin/python scripts/ci/check_performance.py
+          --records performance-1.json performance-2.json performance-3.json
+          --arrays performance-1.npz performance-2.npz performance-3.npz
 
-          device = resolve_device(torch, "mps")
-          assert device.type == "mps"
-
-          seed_torch(torch, 42, device)
-          result = (torch.ones(4, device=device) * 2).cpu().tolist()
-          assert result == [2.0, 2.0, 2.0, 2.0]
-          PY
+      - name: Upload CUDA and performance evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cuda-performance-qualification
+          path: |
+            cuda-qualification.json
+            performance-*.json
+            performance-*.npz
+          if-no-files-found: error
 
   qualify:
     name: Qualify Candidate
     runs-on: ubuntu-latest
-    needs: [stable-platform, python-prerelease, dependency-audit]
+    needs: [stable-platform, python-prerelease, dependency-audit, cuda-qualification]
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 

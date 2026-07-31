@@ -6,9 +6,10 @@ import tarfile
 import zipfile
 from pathlib import Path
 
+import numpy as np
 import pytest
 
-from scripts.ci import candidate
+from scripts.ci import candidate, check_performance
 
 
 @pytest.fixture(scope="module")
@@ -71,3 +72,47 @@ def test_candidate_contains_typing_and_documentation_contracts(candidate_dir: Pa
     assert "SECURITY.md" in sdist_members
     assert "mkdocs.yml" in sdist_members
     assert "docs/getting-started/installation.md" in sdist_members
+
+
+def _performance_inputs(tmp_path: Path) -> tuple[list[Path], list[Path]]:
+    records: list[Path] = []
+    arrays: list[Path] = []
+    for repetition in range(3):
+        record = tmp_path / f"performance-{repetition}.json"
+        record.write_text(
+            json.dumps(
+                {
+                    "device": "cuda",
+                    "environment": {"gpu": "test"},
+                    "profile": "canonical",
+                    "results": {"model": {"fit_seconds": 1.0}},
+                }
+            ),
+            encoding="utf-8",
+        )
+        array = tmp_path / f"performance-{repetition}.npz"
+        np.savez_compressed(array, model=np.array([1.0]))
+        records.append(record)
+        arrays.append(array)
+    return records, arrays
+
+
+def test_performance_checker_accepts_consistent_repetitions(tmp_path: Path) -> None:
+    records, arrays = _performance_inputs(tmp_path)
+
+    check_performance.check(records, arrays)
+
+
+def test_performance_checker_rejects_timing_and_replay_drift(tmp_path: Path) -> None:
+    records, arrays = _performance_inputs(tmp_path)
+    value = json.loads(records[2].read_text(encoding="utf-8"))
+    value["results"]["model"]["fit_seconds"] = 3.0
+    records[2].write_text(json.dumps(value), encoding="utf-8")
+    with pytest.raises(AssertionError, match="timing range"):
+        check_performance.check(records, arrays)
+
+    value["results"]["model"]["fit_seconds"] = 1.0
+    records[2].write_text(json.dumps(value), encoding="utf-8")
+    np.savez_compressed(arrays[2], model=np.array([2.0]))
+    with pytest.raises(AssertionError, match="replay exceeded"):
+        check_performance.check(records, arrays)

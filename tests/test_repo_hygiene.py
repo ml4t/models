@@ -71,7 +71,16 @@ def test_ci_qualifies_one_candidate_across_required_platforms() -> None:
     assert "needs: [lint, typecheck, coverage, docs]" in workflow
     assert "dependency-audit:" in workflow
     assert "torch==2.13.0" in workflow
-    assert "needs: [stable-platform, python-prerelease, dependency-audit]" in workflow
+    assert "cuda-qualification:" in workflow
+    assert "runs-on: [self-hosted, linux, x64, cuda, rtx-3090]" in workflow
+    assert "scripts/ci/hardware_qualification.py" in workflow
+    assert "scripts/ci/performance_qualification.py" in workflow
+    assert "scripts/ci/check_performance.py" in workflow
+    assert "--profile canonical" in workflow
+    assert (
+        "needs: [stable-platform, python-prerelease, dependency-audit, cuda-qualification]"
+        in workflow
+    )
 
 
 def test_release_promotes_qualified_candidate_without_rebuilding() -> None:

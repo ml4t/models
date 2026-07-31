@@ -1,42 +1,52 @@
 # Release Gates
 
-This page defines the checks required before tagging a beta or stable release.
+Stable publication promotes the exact wheel and source distribution qualified by the successful
+main-branch CI run. The release workflow does not rebuild either artifact.
 
-## Local Gate
+## Local Checks
 
-Run the full gate from the repository root:
+Run these checks from the repository root:
 
 ```bash
-uv run ruff check src/ tests/ examples
-uv run ruff format --check src/ tests/ examples
+uv run ruff check src/ tests/ examples/ scripts/
+uv run ruff format --check src/ tests/ examples/ scripts/
 uv run ty check
-uv run pytest tests/ -q
+uv run pytest tests/ -q --cov-report=json:coverage.json
+uv run python scripts/ci/check_coverage.py coverage.json
 uv run mkdocs build --strict
 uv build
+uv run twine check dist/*
+actionlint
 ```
 
-For optional integration paths, also run:
+The local hardware smoke uses CPU while exercising the same fit, persistence, recovery, and
+replay paths as the CUDA and MPS jobs:
 
 ```bash
-uv run --extra integration pytest \
-  tests/test_integration_backtest.py \
-  tests/test_integration_data.py \
-  tests/test_integration_surfaces.py \
-  -q
+uv run python scripts/ci/hardware_qualification.py --device cpu
 ```
 
-## GitHub Gate
+## Blocking CI Checks
 
-The main CI workflow must pass before a beta tag is created:
+The stable candidate requires all of these results:
 
-- lint
-- type check
-- docs
-- Python 3.12 tests
-- Python 3.13 tests
-- Python 3.14 tests
-- package smoke test
-- MPS smoke test
-- package build
+- Ruff, formatting, ty, documentation, and coverage thresholds
+- installed-wheel tests on Linux, macOS, and Windows for Python 3.12, 3.13, and 3.14
+- installed core-wheel tests on the current Python 3.15 prerelease for all three operating systems
+- current and supported-minimum dependency vulnerability scans
+- reproducible wheel reconstruction on every stable operating-system and Python cell
+- RTX 3090 CUDA fit, replay, checkpoint, persistence, CPU recovery, and CUDA recovery checks
+- three fresh-process Chapter 14 performance runs on the CUDA reference host
 
-The release workflow publishes only from `v*` tags after the beta branch has merged.
+MPS runs the public neural workflow matrix on an Apple Silicon hosted runner. It remains a
+non-blocking compatibility result.
+
+## Candidate Identity
+
+CI records the source commit, Git tree, package name, package version, artifact names, sizes, and
+SHA-256 digests in `candidate.json`. Each downstream job verifies that manifest before testing the
+candidate.
+
+A release tag must point to the same commit and match the candidate version exactly. The release
+workflow selects the successful main-branch CI run for that commit, deploys revision-identified
+documentation, verifies the deployed markers, and then publishes the retained distributions.
