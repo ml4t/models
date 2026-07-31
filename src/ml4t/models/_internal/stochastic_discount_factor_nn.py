@@ -218,7 +218,7 @@ def construct_stochastic_discount_factor(
     weighted_returns = weights * returns[mask]
     sdf_values = torch.zeros(returns.shape[0], device=weights.device, dtype=weights.dtype)
     sdf_values.scatter_add_(0, get_segment_ids(mask), weighted_returns)
-    return 1.0 + sdf_values
+    return 1.0 - sdf_values
 
 
 def unconditional_loss(
@@ -230,7 +230,8 @@ def unconditional_loss(
     """Unconditional pricing loss with a constant instrument."""
 
     stochastic_discount_factor = construct_stochastic_discount_factor(returns, weights, mask)
-    sample_moments = (returns * mask.float() * stochastic_discount_factor.unsqueeze(1)).unsqueeze(0)
+    masked_returns = torch.where(mask, returns, torch.zeros_like(returns))
+    sample_moments = (masked_returns * stochastic_discount_factor.unsqueeze(1)).unsqueeze(0)
     weighted_moments = sample_moments.sum(dim=1) / n_obs_per_asset.clamp(min=1).unsqueeze(0)
     n_obs_norm = n_obs_per_asset / n_obs_per_asset.max().clamp(min=1)
     loss = (weighted_moments.pow(2) * n_obs_norm).mean()
@@ -248,7 +249,9 @@ def conditional_loss(
 
     n_instruments = instruments.shape[0]
     stochastic_discount_factor = construct_stochastic_discount_factor(returns, weights, mask)
-    sample_moments = returns * mask.float() * stochastic_discount_factor.unsqueeze(1) * instruments
+    masked_returns = torch.where(mask, returns, torch.zeros_like(returns))
+    masked_instruments = torch.where(mask.unsqueeze(0), instruments, torch.zeros_like(instruments))
+    sample_moments = masked_returns * stochastic_discount_factor.unsqueeze(1) * masked_instruments
     weighted_moments = sample_moments.sum(dim=1) / n_obs_per_asset.clamp(min=1).unsqueeze(0)
     n_obs_norm = n_obs_per_asset / n_obs_per_asset.max().clamp(min=1)
     tiled = n_obs_norm.unsqueeze(0).expand(n_instruments, -1)

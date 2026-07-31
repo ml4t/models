@@ -52,7 +52,7 @@ class RPPCAConfig(LatentFactorConfig):
     model_name: ClassVar[str] = "rp_pca"
     persistent_entities: ClassVar[bool] = True
     gamma: float = 0.0
-    base_moment: str = "covariance"
+    base_moment: str = "second_moment"
     scale_by_asset_volatility: bool = False
     normalize_loadings: str = "unit_length"
     orthogonalize_factors: bool = False

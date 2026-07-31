@@ -37,14 +37,12 @@ def validate_panel_shapes(
 
 
 def compute_managed_portfolios(chars: np.ndarray, returns: np.ndarray) -> np.ndarray:
-    """Compute diagonal characteristic-managed portfolios for each date."""
+    """Compute joint cross-sectional OLS managed portfolios for each date."""
     validate_panel_shapes(chars, returns)
     n_dates, n_slots, n_features = chars.shape
     ones = np.ones((n_dates, n_slots, 1), dtype=np.float32)
     chars_aug = np.concatenate([chars.astype(np.float32, copy=False), ones], axis=2)
     portfolios = np.zeros((n_dates, n_slots, n_features + 1), dtype=np.float32)
-    eps = 1e-8
-
     for date_idx in range(n_dates):
         z_t = chars_aug[date_idx]
         r_t = returns[date_idx]
@@ -53,9 +51,7 @@ def compute_managed_portfolios(chars: np.ndarray, returns: np.ndarray) -> np.nda
             continue
         z_valid = z_t[valid].astype(np.float64)
         r_valid = r_t[valid].astype(np.float64)
-        numerator = (z_valid * r_valid[:, None]).sum(axis=0)
-        denominator = (z_valid**2).sum(axis=0)
-        x_t = numerator / np.maximum(denominator, eps)
+        x_t, *_ = np.linalg.lstsq(z_valid, r_valid, rcond=None)
         portfolios[date_idx] = np.broadcast_to(
             x_t.astype(np.float32)[None, :],
             (n_slots, n_features + 1),

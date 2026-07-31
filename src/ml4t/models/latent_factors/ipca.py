@@ -489,14 +489,18 @@ def _normalize_theta_y(
     order = np.argsort(eigvals)[::-1]
     rotation = eigvecs[:, order]  # orthonormal K × K
 
-    # Step 3: deterministic sign convention. Eigenvectors are unique only up
-    # to ±. Pin signs so each column of Γ has a non-negative max-magnitude
-    # entry, making results reproducible across runs.
+    # Step 3: KPS sign convention. Make each factor mean non-negative. For an
+    # exactly zero mean, pin the sign by the largest-magnitude loading so the
+    # result remains deterministic.
     gamma_final = gamma_orthonormal @ rotation
     f_final = f_intermediate @ rotation
     for k in range(n_factors):
-        argmax = int(np.argmax(np.abs(gamma_final[:, k])))
-        if gamma_final[argmax, k] < 0:
+        factor_mean = float(np.mean(f_final[:, k]))
+        flip = factor_mean < 0.0
+        if np.isclose(factor_mean, 0.0, atol=1e-14, rtol=0.0):
+            argmax = int(np.argmax(np.abs(gamma_final[:, k])))
+            flip = gamma_final[argmax, k] < 0.0
+        if flip:
             gamma_final[:, k] *= -1.0
             f_final[:, k] *= -1.0
 

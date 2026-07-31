@@ -30,8 +30,13 @@ def compute_net_portfolio_returns(
     """Compute net portfolio returns for a sequence of cross-sectional decisions."""
 
     batch_size, n_periods, n_assets = weights.shape
+    available = mask.to(dtype=torch.bool)
 
-    scaled_weights = vol_scale * weights
+    scaled_weights = torch.where(
+        available,
+        vol_scale * weights,
+        torch.zeros_like(weights),
+    )
     previous = torch.cat(
         [
             torch.zeros((batch_size, 1, n_assets), device=weights.device, dtype=weights.dtype),
@@ -40,7 +45,12 @@ def compute_net_portfolio_returns(
         dim=1,
     )
 
-    gross = (mask * weights * forward_returns).sum(dim=-1)
+    gross_contributions = torch.where(
+        available,
+        weights * forward_returns,
+        torch.zeros_like(weights),
+    )
+    gross = gross_contributions.sum(dim=-1)
     n_available = mask.sum(dim=-1).clamp(min=1.0)
     gross = gross / n_available
 
@@ -52,8 +62,12 @@ def compute_net_portfolio_returns(
     else:
         raise ValueError("costs must have shape (N,) or (N, 1)")
 
-    turnover = torch.abs(scaled_weights - previous)
-    cost = (mask * cost_tensor * turnover).sum(dim=-1)
+    turnover = torch.where(
+        available,
+        torch.abs(scaled_weights - previous),
+        torch.zeros_like(weights),
+    )
+    cost = (cost_tensor * turnover).sum(dim=-1)
     cost = (gamma_cost * cost) / n_available
     return gross - cost
 
@@ -79,7 +93,12 @@ def sharpe_ratio(
 def softmin_sharpe(window_sharpes: torch.Tensor, *, tau: float) -> torch.Tensor:
     """Soft minimum of window-wise Sharpe ratios."""
 
-    return -tau * torch.log(torch.mean(torch.exp(-window_sharpes / tau)))
+    n_windows = torch.as_tensor(
+        window_sharpes.numel(),
+        dtype=window_sharpes.dtype,
+        device=window_sharpes.device,
+    )
+    return -tau * (torch.logsumexp(-window_sharpes / tau, dim=0) - torch.log(n_windows))
 
 
 def robust_sharpe_loss(
