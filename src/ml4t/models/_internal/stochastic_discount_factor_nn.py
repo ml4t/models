@@ -58,8 +58,12 @@ class StochasticDiscountFactorNetwork(nn.Module):
 
         if self.use_context and context_features is not None:
             if h0 is None:
-                h0 = torch.zeros(1, 1, self.state_dim, device=asset_features.device)
-                c0 = torch.zeros(1, 1, self.state_dim, device=asset_features.device)
+                h0 = torch.zeros(
+                    1, 1, self.state_dim, device=asset_features.device, dtype=asset_features.dtype
+                )
+                c0 = torch.zeros(
+                    1, 1, self.state_dim, device=asset_features.device, dtype=asset_features.dtype
+                )
             context_seq = context_features.unsqueeze(0)
             context_states, (h_n, c_n) = self.lstm(context_seq, (h0, c0))
             context_states = context_states.squeeze(0)
@@ -118,8 +122,12 @@ class MomentNetwork(nn.Module):
         n_periods, n_assets, _ = asset_features.shape
         if self.use_context and context_features is not None:
             if h0 is None:
-                h0 = torch.zeros(1, 1, self.state_dim, device=asset_features.device)
-                c0 = torch.zeros(1, 1, self.state_dim, device=asset_features.device)
+                h0 = torch.zeros(
+                    1, 1, self.state_dim, device=asset_features.device, dtype=asset_features.dtype
+                )
+                c0 = torch.zeros(
+                    1, 1, self.state_dim, device=asset_features.device, dtype=asset_features.dtype
+                )
             context_seq = context_features.unsqueeze(0)
             context_states, (h_n, c_n) = self.lstm(context_seq, (h0, c0))
             context_states = context_states.squeeze(0)
@@ -185,8 +193,12 @@ class BetaNetwork(nn.Module):
 
         if self.use_context and context_features is not None:
             if h0 is None:
-                h0 = torch.zeros(1, 1, self.state_dim, device=asset_features.device)
-                c0 = torch.zeros(1, 1, self.state_dim, device=asset_features.device)
+                h0 = torch.zeros(
+                    1, 1, self.state_dim, device=asset_features.device, dtype=asset_features.dtype
+                )
+                c0 = torch.zeros(
+                    1, 1, self.state_dim, device=asset_features.device, dtype=asset_features.dtype
+                )
             context_seq = context_features.unsqueeze(0)
             context_states, (h_n, c_n) = self.lstm(context_seq, (h0, c0))
             context_states = context_states.squeeze(0)

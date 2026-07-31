@@ -51,8 +51,9 @@ class IPCAModel(BaseLatentFactorModel[IPCAConfig]):
         if cross_section.returns is None:
             raise ValueError("IPCA requires returns in the training batch")
 
-        characteristics = np.asarray(cross_section.characteristics, dtype=np.float64)
-        returns = np.asarray(cross_section.returns, dtype=np.float64)
+        dtype = np.dtype(self.config.dtype)
+        characteristics = np.asarray(cross_section.characteristics, dtype=dtype)
+        returns = np.asarray(cross_section.returns, dtype=dtype)
         mask = _resolve_mask(cross_section)
 
         train_designs, train_targets = _extract_cross_sections(
@@ -85,8 +86,8 @@ class IPCAModel(BaseLatentFactorModel[IPCAConfig]):
             designs=train_designs,
             targets=train_targets,
             n_factors=self.config.n_factors,
-        )
-        factor_history = np.zeros((len(train_designs), self.config.n_factors), dtype=np.float64)
+        ).astype(dtype, copy=False)
+        factor_history = np.zeros((len(train_designs), self.config.n_factors), dtype=dtype)
         converged = False
         previous_objective = float("inf")
         target_sum_squares = float(sum(target @ target for target in train_targets))
@@ -130,7 +131,7 @@ class IPCAModel(BaseLatentFactorModel[IPCAConfig]):
                 factor_history=factor_history,
             )
             if np.isfinite(previous_objective):
-                scale = max(abs(previous_objective), np.finfo(np.float64).eps)
+                scale = max(abs(previous_objective), np.finfo(dtype).eps)
                 self._fit_objective_delta = abs(objective - previous_objective) / scale
             previous_objective = objective
             if max(self._fit_objective_delta, self._fit_forecast_delta) <= self.config.tol:
@@ -153,8 +154,8 @@ class IPCAModel(BaseLatentFactorModel[IPCAConfig]):
         # (1/T) Σ_t f_t f_t' diagonal with descending entries.
         gamma, factor_history = _normalize_theta_y(gamma, factor_history)
 
-        self._gamma = gamma
-        self._train_factor_returns = factor_history
+        self._gamma = gamma.astype(dtype, copy=False)
+        self._train_factor_returns = factor_history.astype(dtype, copy=False)
         self._asset_ids = cross_section.asset_ids
         self._n_features = characteristics.shape[2]
         self._fit_converged = converged
@@ -197,7 +198,8 @@ class IPCAModel(BaseLatentFactorModel[IPCAConfig]):
         if not self.is_fitted or self._gamma is None or self._n_features is None:
             raise RuntimeError("IPCA model must be fitted before extract()")
 
-        characteristics = np.asarray(cross_section.characteristics, dtype=np.float64)
+        dtype = np.dtype(self.config.dtype)
+        characteristics = np.asarray(cross_section.characteristics, dtype=dtype)
         if characteristics.shape[2] != self._n_features:
             raise ValueError(
                 "characteristics feature dimension does not match fitted IPCA model; "
@@ -208,17 +210,17 @@ class IPCAModel(BaseLatentFactorModel[IPCAConfig]):
         asset_betas = np.full(
             (cross_section.n_periods, cross_section.n_assets, self.config.n_factors),
             np.nan,
-            dtype=np.float64,
+            dtype=dtype,
         )
         returns = None
         if cross_section.returns is not None:
-            returns = np.asarray(cross_section.returns, dtype=np.float64)
+            returns = np.asarray(cross_section.returns, dtype=dtype)
         factor_returns = None
         if returns is not None:
             factor_returns = np.full(
                 (cross_section.n_periods, self.config.n_factors),
                 np.nan,
-                dtype=np.float64,
+                dtype=dtype,
             )
 
         for date_idx in range(cross_section.n_periods):
@@ -248,9 +250,9 @@ class IPCAModel(BaseLatentFactorModel[IPCAConfig]):
                     betas_returns_t = design_returns_t @ self._gamma
                     gram = betas_returns_t.T @ betas_returns_t + self.config.factor_ridge * np.eye(
                         self.config.n_factors,
-                        dtype=np.float64,
+                        dtype=dtype,
                     )
-                    rhs = betas_returns_t.T @ returns_t[valid_returns].astype(np.float64)
+                    rhs = betas_returns_t.T @ returns_t[valid_returns].astype(dtype, copy=False)
                     factor_returns[date_idx] = _solve_linear_system(gram, rhs)
 
         return LatentFactorState(

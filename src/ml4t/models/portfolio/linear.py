@@ -43,8 +43,9 @@ class LinearFeaturePortfolioModel(BasePortfolioModel):
         validate_portfolio_training_batch(batch)
         del validation_batch
 
-        features = np.asarray(batch.features, dtype=np.float64)
-        returns = np.asarray(batch.returns, dtype=np.float64)
+        dtype = np.dtype(self.config.dtype)
+        features = np.asarray(batch.features, dtype=dtype)
+        returns = np.asarray(batch.returns, dtype=dtype)
         mask = (
             np.asarray(batch.mask, dtype=bool)
             if batch.mask is not None
@@ -57,16 +58,16 @@ class LinearFeaturePortfolioModel(BasePortfolioModel):
         design = features[valid]
         target = returns[valid]
         if self.config.fit_intercept:
-            design = np.column_stack([np.ones(design.shape[0], dtype=np.float64), design])
+            design = np.column_stack([np.ones(design.shape[0], dtype=dtype), design])
 
-        ridge_penalty = self.config.ridge_alpha * np.eye(design.shape[1], dtype=np.float64)
+        ridge_penalty = self.config.ridge_alpha * np.eye(design.shape[1], dtype=dtype)
         if self.config.fit_intercept:
             ridge_penalty[0, 0] = 0.0
         lhs = design.T @ design + ridge_penalty
         rhs = design.T @ target
         coefficients = np.linalg.solve(lhs, rhs)
 
-        self._coefficients = coefficients.astype(np.float64)
+        self._coefficients = coefficients.astype(dtype, copy=False)
         self._asset_ids = batch.asset_ids
         self._n_features = features.shape[3]
         self._mark_fitted()
@@ -96,7 +97,7 @@ class LinearFeaturePortfolioModel(BasePortfolioModel):
         if batch.features.shape[3] != self._n_features:
             raise ValueError("prediction batch feature dimension does not match the fitted model")
 
-        features = np.asarray(batch.features, dtype=np.float64)
+        features = np.asarray(batch.features, dtype=np.dtype(self.config.dtype))
         mask = (
             np.asarray(batch.mask, dtype=bool)
             if batch.mask is not None

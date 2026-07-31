@@ -26,7 +26,9 @@ class ExpandingMeanFactorForecaster(BaseFactorForecaster[ExpandingMeanForecaster
         self._mean_factor_premium: np.ndarray | None = None
 
     def fit(self, state: LatentFactorState) -> FitSummary:
-        factors = require_estimable_factor_returns(state)
+        factors = require_estimable_factor_returns(state).astype(
+            np.dtype(self.config.dtype), copy=False
+        )
         mean_factor_premium = np.nanmean(factors, axis=0)
         if not np.isfinite(mean_factor_premium).all():
             raise FloatingPointError("factor mean estimation produced non-finite output")

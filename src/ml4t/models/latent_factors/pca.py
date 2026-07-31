@@ -34,7 +34,7 @@ class PCAModel(BaseLatentFactorModel[PCAConfig]):
         if persistent.returns is None:
             raise ValueError("PCA requires returns in the training batch")
 
-        returns = np.asarray(persistent.returns, dtype=np.float64)
+        returns = np.asarray(persistent.returns, dtype=np.dtype(self.config.dtype))
         n_periods, n_assets = returns.shape
         max_factors = min(n_periods, n_assets)
         if self.config.n_factors > max_factors:
@@ -104,7 +104,8 @@ class PCAModel(BaseLatentFactorModel[PCAConfig]):
         factor_returns = None
         if persistent.returns is not None and self._asset_mean is not None:
             asset_mean = self._asset_mean[order]
-            centered = np.asarray(persistent.returns, dtype=np.float64) - asset_mean[None, :]
+            centered = np.asarray(persistent.returns, dtype=np.dtype(self.config.dtype))
+            centered = centered - asset_mean[None, :]
             centered = np.where(np.isfinite(centered), centered, 0.0)
             factor_returns = centered @ loadings
 

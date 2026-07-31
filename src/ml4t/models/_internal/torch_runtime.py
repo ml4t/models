@@ -42,6 +42,16 @@ def resolve_device(torch: Any, requested: str) -> Any:
     )
 
 
+def resolve_dtype(torch: Any, requested: str) -> Any:
+    """Resolve a validated public precision name to its PyTorch dtype."""
+
+    if requested == "float32":
+        return torch.float32
+    if requested == "float64":
+        return torch.float64
+    raise ValueError(f"requested dtype must be 'float32' or 'float64'; got {requested!r}")
+
+
 def seed_torch(torch: Any, seed: int, device: Any) -> None:
     torch.manual_seed(seed)
     device_type = getattr(device, "type", "cpu")

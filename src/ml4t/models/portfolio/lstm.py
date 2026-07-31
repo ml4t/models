@@ -24,7 +24,7 @@ from ml4t.models._internal.portfolio_validation import (
     validate_portfolio_prediction_batch,
     validate_portfolio_training_batch,
 )
-from ml4t.models._internal.torch_runtime import resolve_device, seed_torch
+from ml4t.models._internal.torch_runtime import resolve_device, resolve_dtype, seed_torch
 from ml4t.models.configs import LSTMPortfolioConfig
 from ml4t.models.portfolio.base import BasePortfolioModel
 from ml4t.models.portfolio.components import FiLM, StaticContextEncoder, VariableSelection
@@ -170,6 +170,7 @@ class LSTMPortfolioModel(BasePortfolioModel):
             raise ValueError("train and validation batches must share asset_ids")
 
         device = resolve_device(torch, self.config.device)
+        dtype = resolve_dtype(torch, self.config.dtype)
         seed_torch(torch, self.config.seed, device)
 
         model = LSTMPortfolioPolicy(
@@ -177,7 +178,7 @@ class LSTMPortfolioModel(BasePortfolioModel):
             n_features=batch.features.shape[3],
             n_groups=self._resolve_n_groups(batch),
             config=self.config,
-        ).to(device)
+        ).to(device=device, dtype=dtype)
         artifacts = fit_policy_network(
             model,
             batch=batch,
@@ -217,6 +218,7 @@ class LSTMPortfolioModel(BasePortfolioModel):
         validate_portfolio_identity(batch, self._asset_ids)
 
         device = resolve_device(torch, self.config.device)
+        dtype = resolve_dtype(torch, self.config.dtype)
         selected_checkpoint = select_checkpoint_epoch(
             checkpoint=checkpoint,
             configured_default=self.config.default_checkpoint,
@@ -227,15 +229,15 @@ class LSTMPortfolioModel(BasePortfolioModel):
             n_features=self._n_features,
             n_groups=self._n_groups,
             config=self.config,
-        ).to(device)
+        ).to(device=device, dtype=dtype)
         model.load_state_dict(deepcopy(self._checkpoint_states[selected_checkpoint]))
         model.eval()
 
         asset_indices = torch.arange(batch.n_assets, dtype=torch.long, device=device)
-        features = torch.as_tensor(batch.features, dtype=torch.float32, device=device)
-        mask = mask_tensor(batch, device)
+        features = torch.as_tensor(batch.features, dtype=dtype, device=device)
+        mask = mask_tensor(batch, device, dtype=dtype)
         group_ids = group_ids_tensor(batch, device)
-        costs = costs_tensor(batch, device)
+        costs = costs_tensor(batch, device, dtype=dtype)
 
         with torch.no_grad():
             weights = model(
