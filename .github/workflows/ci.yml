@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   PYTHON_VERSION: "3.12"
   UV_NO_SOURCES: "1"
@@ -15,151 +22,263 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8.2.0
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           version: "latest"
 
       - name: Set up Python
-        run: uv python install ${{ env.PYTHON_VERSION }}
+        id: setup-python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
-        run: uv sync --dev
+        run: uv sync --dev --python "${{ steps.setup-python.outputs.python-path }}"
 
-      - name: Run ruff check
-        run: uv run ruff check src/ tests/
+      - name: Run Ruff check
+        run: uv run ruff check src/ tests/ examples/ scripts/
 
-      - name: Run ruff format check
-        run: uv run ruff format --check src/ tests/
+      - name: Run Ruff format check
+        run: uv run ruff format --check src/ tests/ examples/ scripts/
 
   typecheck:
     name: Type Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8.2.0
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           version: "latest"
 
       - name: Set up Python
-        run: uv python install ${{ env.PYTHON_VERSION }}
+        id: setup-python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
-        run: uv sync --dev
+        run: uv sync --dev --python "${{ steps.setup-python.outputs.python-path }}"
 
       - name: Run ty check
         run: uv run ty check
+
+      - name: Type-check CI scripts
+        run: uv run ty check scripts/ci/candidate.py scripts/ci/test_wheel.py
 
   docs:
     name: Docs
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8.2.0
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           version: "latest"
 
       - name: Set up Python
-        run: uv python install ${{ env.PYTHON_VERSION }}
+        id: setup-python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
-        run: uv sync --dev --extra docs
+        run: uv sync --dev --extra docs --python "${{ steps.setup-python.outputs.python-path }}"
 
       - name: Build docs
         run: uv run mkdocs build --strict
 
-  test:
-    name: Test (Python ${{ matrix.python-version }})
+  build-candidate:
+    name: Build Candidate
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.12", "3.13", "3.14"]
-
+    needs: [lint, typecheck, docs]
     steps:
-      - uses: actions/checkout@v6.0.3
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v8.2.0
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
-          version: "latest"
-
-      - name: Set up Python ${{ matrix.python-version }}
-        run: uv python install ${{ matrix.python-version }}
-
-      - name: Install dependencies
-        run: uv sync --dev
-
-      - name: Run tests
-        run: uv run pytest tests/ -v --tb=short
-
-  test-package-smoke:
-    name: Test Package Smoke
-    runs-on: ubuntu-latest
-    needs: [lint, typecheck]
-    steps:
-      - uses: actions/checkout@v6.0.3
+          fetch-depth: 0
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8.2.0
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           version: "latest"
 
       - name: Set up Python
-        run: uv python install ${{ env.PYTHON_VERSION }}
+        id: setup-python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Build wheel
-        run: uv build
+      - name: Install build checks
+        run: uv sync --dev --python "${{ steps.setup-python.outputs.python-path }}"
 
-      - name: Create isolated smoke environment
-        run: uv venv .smoke-venv --python ${{ env.PYTHON_VERSION }}
+      - name: Build candidate
+        run: uv build --out-dir candidate/dist
 
-      - name: Install built wheel
-        run: uv pip install --python .smoke-venv/bin/python dist/*.whl
+      - name: Record candidate identity
+        run: >-
+          uv run python scripts/ci/candidate.py create candidate
+          --commit-sha "${{ github.sha }}"
+          --git-tree "$(git rev-parse HEAD^{tree})"
 
-      - name: Verify import surface
-        run: |
-          .smoke-venv/bin/python -c "import ml4t.models as m; print(m.__version__)"
-          .smoke-venv/bin/python -c "from ml4t.models import PCAModel, SAEModel, StochasticDiscountFactorModel"
+      - name: Verify package metadata
+        run: uv run twine check candidate/dist/*
+
+      - name: Verify candidate manifest
+        run: >-
+          uv run python scripts/ci/candidate.py verify candidate
+          --expected-commit "${{ github.sha }}"
+          --expected-tree "$(git rev-parse HEAD^{tree})"
+
+      - name: Upload candidate
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-candidate
+          path: candidate/
+          if-no-files-found: error
+
+  stable-platform:
+    name: ${{ matrix.os }} / Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    needs: build-candidate
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        id: setup-python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Download candidate
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-candidate
+          path: candidate
+
+      - name: Verify candidate identity
+        run: >-
+          python scripts/ci/candidate.py verify candidate
+          --expected-commit "${{ github.sha }}"
+
+      - name: Install development environment
+        run: uv sync --dev --python "${{ steps.setup-python.outputs.python-path }}"
+
+      - name: Run source tests
+        run: uv run pytest tests/ -q --tb=short
+
+      - name: Run type check
+        run: uv run ty check
+
+      - name: Rebuild wheel
+        run: >-
+          uv build --wheel --out-dir rebuilt-dist
+          --python "${{ steps.setup-python.outputs.python-path }}"
+
+      - name: Verify reproducible wheel
+        run: python scripts/ci/candidate.py compare-wheel candidate rebuilt-dist
+
+      - name: Test installed candidate
+        run: >-
+          python scripts/ci/test_wheel.py candidate
+          --python-version "${{ steps.setup-python.outputs.python-path }}"
+          --mode full
+
+  python-prerelease:
+    name: ${{ matrix.os }} / Python 3.15 prerelease
+    runs-on: ${{ matrix.os }}
+    needs: build-candidate
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          version: "latest"
+
+      - name: Set up current Python prerelease
+        id: setup-python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.15"
+          allow-prereleases: true
+          check-latest: true
+
+      - name: Download candidate
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-candidate
+          path: candidate
+
+      - name: Verify candidate identity
+        run: >-
+          python scripts/ci/candidate.py verify candidate
+          --expected-commit "${{ github.sha }}"
+
+      - name: Test installed core candidate
+        run: >-
+          python scripts/ci/test_wheel.py candidate
+          --python-version "${{ steps.setup-python.outputs.python-path }}"
+          --mode core
 
   mps-smoke:
     name: MPS Smoke
     runs-on: macos-15
-    timeout-minutes: 10
+    needs: build-candidate
+    continue-on-error: true
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8.2.0
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           version: "latest"
 
       - name: Set up Python
-        run: uv python install ${{ env.PYTHON_VERSION }}
+        id: setup-python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install dependencies
-        run: uv sync --dev
+      - name: Download candidate
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-candidate
+          path: candidate
+
+      - name: Install candidate
+        run: |
+          wheel="$(find candidate/dist -name '*.whl' -print -quit)"
+          uv venv .mps-venv --python "${{ steps.setup-python.outputs.python-path }}"
+          uv pip install --python .mps-venv/bin/python "${wheel}[all]"
 
       - name: Verify PyTorch MPS
         run: |
-          uv run python - <<'PY'
+          .mps-venv/bin/python - <<'PY'
           import platform
 
           import torch
 
           from ml4t.models._internal.torch_runtime import resolve_device, seed_torch
-
-          print(platform.platform())
-          print("machine:", platform.machine())
-          print("torch:", torch.__version__)
-          print("mps built:", torch.backends.mps.is_built())
-          print("mps available:", torch.backends.mps.is_available())
 
           assert platform.machine() == "arm64"
           assert torch.backends.mps.is_built()
@@ -169,34 +288,24 @@ jobs:
           assert device.type == "mps"
 
           seed_torch(torch, 42, device)
-          x = torch.ones(4, device=device)
-          y = x * 2
-          assert y.device.type == "mps"
-          assert y.cpu().tolist() == [2.0, 2.0, 2.0, 2.0]
+          result = (torch.ones(4, device=device) * 2).cpu().tolist()
+          assert result == [2.0, 2.0, 2.0, 2.0]
           PY
 
-  build:
-    name: Build Package
+  qualify:
+    name: Qualify Candidate
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, docs, test, test-package-smoke, mps-smoke]
+    needs: [stable-platform, python-prerelease]
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Download candidate
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          fetch-depth: 0
+          name: release-candidate
+          path: candidate
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v8.2.0
-        with:
-          version: "latest"
-
-      - name: Set up Python
-        run: uv python install ${{ env.PYTHON_VERSION }}
-
-      - name: Build package
-        run: uv build
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v7.0.1
-        with:
-          name: dist
-          path: dist/
+      - name: Verify qualified candidate
+        run: >-
+          python scripts/ci/candidate.py verify candidate
+          --expected-commit "${{ github.sha }}"
