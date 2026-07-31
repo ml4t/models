@@ -75,8 +75,8 @@ They should not define the public API by accident.
 
 ## Compatibility Status
 
-The `0.1.0b0` beta line is validated against the Chapter 14 teaching flow and the shared
-case-study latent-factor bridge.
+The `0.1.0` stable line is validated against the Chapter 14 teaching flow and the shared case-study
+latent-factor bridge.
 
 | Book surface | Validation status |
 |---|---|
