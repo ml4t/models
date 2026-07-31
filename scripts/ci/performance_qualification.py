@@ -23,11 +23,18 @@ from ml4t.models import (
     CAEConfig,
     CAEModel,
     CrossSectionBatch,
+    DeepPortfolioConfig,
+    DeepPortfolioModel,
     IPCAConfig,
     IPCAModel,
+    LinearFeaturePortfolioModel,
+    LinearPortfolioConfig,
+    LSTMPortfolioConfig,
+    LSTMPortfolioModel,
     PCAConfig,
     PCAModel,
     PersistentPanelBatch,
+    PortfolioSequenceBatch,
     RPPCAConfig,
     RPPCAModel,
     SAEConfig,
@@ -50,6 +57,9 @@ class Profile:
     factors: int = 0
     epochs: int = 0
     ensemble: int = 1
+    windows: int = 0
+    sequence: int = 0
+    iterations: int = 0
 
 
 CANONICAL = {
@@ -59,6 +69,9 @@ CANONICAL = {
     "cae": Profile(500, 500, 46, factors=5, epochs=200, ensemble=5),
     "sdf": Profile(500, 200, 46),
     "sae": Profile(500, 300, 46, epochs=25),
+    "linear_portfolio": Profile(0, 200, 17, windows=16, sequence=63),
+    "lstm_portfolio": Profile(0, 200, 17, windows=16, sequence=63, iterations=5),
+    "deep_portfolio": Profile(0, 200, 17, windows=16, sequence=63, iterations=5),
 }
 
 SMOKE = {
@@ -68,6 +81,9 @@ SMOKE = {
     "cae": Profile(8, 5, 3, factors=1, epochs=1),
     "sdf": Profile(8, 5, 3),
     "sae": Profile(8, 5, 3, epochs=1),
+    "linear_portfolio": Profile(0, 3, 2, windows=2, sequence=4),
+    "lstm_portfolio": Profile(0, 3, 2, windows=2, sequence=4, iterations=1),
+    "deep_portfolio": Profile(0, 3, 2, windows=2, sequence=4, iterations=1),
 }
 
 TIME_LIMITS = {
@@ -77,12 +93,17 @@ TIME_LIMITS = {
     "cae": 360.0,
     "sdf": 1_200.0,
     "sae": 2_400.0,
+    "linear_portfolio": 30.0,
+    "lstm_portfolio": 300.0,
+    "deep_portfolio": 600.0,
 }
 
 CUDA_MEMORY_LIMITS = {
     "cae": int(6.5 * 1024**3),
     "sdf": int(9.75 * 1024**3),
     "sae": int(10.625 * 1024**3),
+    "lstm_portfolio": int(8.0 * 1024**3),
+    "deep_portfolio": int(10.0 * 1024**3),
 }
 
 
@@ -119,6 +140,30 @@ def _cross_section(profile: Profile) -> CrossSectionBatch:
         returns=returns,
         context_features=rng.normal(size=(profile.periods, 8)),
         timestamps=tuple(range(profile.periods)),
+        asset_ids=tuple(f"asset-{index}" for index in range(profile.assets)),
+    )
+
+
+def _portfolio_batch(profile: Profile) -> PortfolioSequenceBatch:
+    rng = np.random.default_rng(SEED)
+    shape = (profile.windows, profile.sequence, profile.assets, profile.features)
+    features = rng.normal(size=shape)
+    coefficients = rng.normal(0.0, 0.01, size=profile.features)
+    returns = features @ coefficients + rng.normal(
+        0.0,
+        0.01,
+        size=(profile.windows, profile.sequence, profile.assets),
+    )
+    return PortfolioSequenceBatch(
+        features=features,
+        returns=returns,
+        vol_scale=np.ones_like(returns),
+        prev_weights=np.zeros((profile.windows, profile.assets)),
+        mask=np.ones_like(returns, dtype=bool),
+        group_ids=np.arange(profile.assets, dtype=np.int64) % 10,
+        costs=np.full(profile.assets, 0.001),
+        adjacency_mask=np.zeros((profile.assets, profile.assets), dtype=bool),
+        timestamps=tuple(range(profile.sequence)),
         asset_ids=tuple(f"asset-{index}" for index in range(profile.assets)),
     )
 
@@ -341,6 +386,89 @@ def _sae(
     )
 
 
+def _linear_portfolio(
+    profile: Profile, directory: Path, enforce: bool
+) -> tuple[dict[str, Any], np.ndarray]:
+    batch = _portfolio_batch(profile)
+    model = LinearFeaturePortfolioModel(LinearPortfolioConfig(dtype="float64", device="cpu"))
+    return _measure(
+        name="linear_portfolio",
+        model=model,
+        fit=lambda: model.fit(batch),
+        infer=lambda value: value.predict(batch).weights,
+        load=lambda path: LinearFeaturePortfolioModel.load(path, device="cpu"),
+        device="cpu",
+        directory=directory,
+        enforce_limits=enforce,
+    )
+
+
+def _lstm_portfolio(
+    profile: Profile, device: str, directory: Path, enforce: bool
+) -> tuple[dict[str, Any], np.ndarray]:
+    batch = _portfolio_batch(profile)
+    model = LSTMPortfolioModel(
+        LSTMPortfolioConfig(
+            hidden_size=64 if enforce else 4,
+            n_layers=1,
+            dropout=0.0,
+            batch_size=4,
+            max_iters=profile.iterations,
+            eval_every=1,
+            checkpoint_every=profile.iterations,
+            default_checkpoint=profile.iterations,
+            early_stopping_burn_in_iters=profile.iterations + 1,
+            dtype="float32",
+            seed=SEED,
+            device=device,
+        )
+    )
+    return _measure(
+        name="lstm_portfolio",
+        model=model,
+        fit=lambda: model.fit(batch, validation_batch=batch),
+        infer=lambda value: value.predict(batch, checkpoint=profile.iterations).weights,
+        load=lambda path: LSTMPortfolioModel.load(path, device=device),
+        device=device,
+        directory=directory,
+        enforce_limits=enforce,
+    )
+
+
+def _deep_portfolio(
+    profile: Profile, device: str, directory: Path, enforce: bool
+) -> tuple[dict[str, Any], np.ndarray]:
+    batch = _portfolio_batch(profile)
+    model = DeepPortfolioModel(
+        DeepPortfolioConfig(
+            d_model=64 if enforce else 4,
+            n_heads=2 if enforce else 1,
+            cross_attention_heads=2 if enforce else 1,
+            macro_gnn_heads=2 if enforce else 1,
+            dropout=0.0,
+            batch_size=4,
+            max_iters=profile.iterations,
+            eval_every=1,
+            checkpoint_every=profile.iterations,
+            default_checkpoint=profile.iterations,
+            early_stopping_burn_in_iters=profile.iterations + 1,
+            dtype="float32",
+            seed=SEED,
+            device=device,
+        )
+    )
+    return _measure(
+        name="deep_portfolio",
+        model=model,
+        fit=lambda: model.fit(batch, validation_batch=batch),
+        infer=lambda value: value.predict(batch, checkpoint=profile.iterations).weights,
+        load=lambda path: DeepPortfolioModel.load(path, device=device),
+        device=device,
+        directory=directory,
+        enforce_limits=enforce,
+    )
+
+
 def qualify(profile_name: str, device: str) -> tuple[dict[str, Any], dict[str, np.ndarray]]:
     if device == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("canonical CUDA performance qualification requires CUDA")
@@ -355,6 +483,13 @@ def qualify(profile_name: str, device: str) -> tuple[dict[str, Any], dict[str, n
             "cae": _cae(profiles["cae"], device, directory, enforce),
             "sdf": _sdf(profiles["sdf"], device, directory, enforce),
             "sae": _sae(profiles["sae"], device, directory, enforce),
+            "linear_portfolio": _linear_portfolio(profiles["linear_portfolio"], directory, enforce),
+            "lstm_portfolio": _lstm_portfolio(
+                profiles["lstm_portfolio"], device, directory, enforce
+            ),
+            "deep_portfolio": _deep_portfolio(
+                profiles["deep_portfolio"], device, directory, enforce
+            ),
         }
     results = {name: value[0] for name, value in measured.items()}
     arrays = {name: value[1] for name, value in measured.items()}

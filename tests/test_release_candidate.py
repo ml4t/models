@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from scripts.ci import candidate, check_performance
+from scripts.ci import candidate, check_performance, performance_qualification
 
 
 @pytest.fixture(scope="module")
@@ -106,6 +106,16 @@ def test_performance_checker_accepts_consistent_repetitions(tmp_path: Path) -> N
     check_performance.check(records, arrays)
 
 
+def test_performance_checker_ignores_submeasurement_timing_noise(tmp_path: Path) -> None:
+    records, arrays = _performance_inputs(tmp_path)
+    for index, record in enumerate(records, start=1):
+        value = json.loads(record.read_text(encoding="utf-8"))
+        value["results"]["model"]["fit_seconds"] = index * 0.001
+        record.write_text(json.dumps(value), encoding="utf-8")
+
+    check_performance.check(records, arrays)
+
+
 def test_performance_checker_rejects_timing_and_replay_drift(tmp_path: Path) -> None:
     records, arrays = _performance_inputs(tmp_path)
     value = json.loads(records[2].read_text(encoding="utf-8"))
@@ -119,3 +129,20 @@ def test_performance_checker_rejects_timing_and_replay_drift(tmp_path: Path) -> 
     np.savez_compressed(arrays[2], model=np.array([2.0]))
     with pytest.raises(AssertionError, match="replay exceeded"):
         check_performance.check(records, arrays)
+
+
+def test_performance_profiles_cover_representative_public_model_families() -> None:
+    expected = {
+        "pca",
+        "rp_pca",
+        "ipca",
+        "cae",
+        "sdf",
+        "sae",
+        "linear_portfolio",
+        "lstm_portfolio",
+        "deep_portfolio",
+    }
+
+    assert set(performance_qualification.CANONICAL) == expected
+    assert set(performance_qualification.SMOKE) == expected
