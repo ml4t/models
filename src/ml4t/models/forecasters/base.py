@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
-from ml4t.models.configs import BaseModelConfig
+from ml4t.models.configs.base import BaseModelConfig
 from ml4t.models.types import FactorForecastResult, FitSummary, LatentFactorState
 
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import torch
 from torch import nn
 
-from ml4t.models.configs import PortfolioConfig
+from ml4t.models.configs.portfolio import PortfolioConfig
 
 
 class StaticContextEncoder(nn.Module):

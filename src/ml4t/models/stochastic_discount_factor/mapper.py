@@ -22,7 +22,8 @@ from ml4t.models._internal.persistence import (
     unpack_tensor_tree,
 )
 from ml4t.models._internal.torch_runtime import import_torch, resolve_device, seed_torch
-from ml4t.models.configs import MapperConfig, StochasticDiscountFactorConfig
+from ml4t.models.configs.latent_factor import StochasticDiscountFactorConfig
+from ml4t.models.configs.pipeline import MapperConfig
 from ml4t.models.types import (
     AssetForecastResult,
     AssetSignalResult,

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from ml4t.models.configs import AssetPredictionConfig
+from ml4t.models.configs.asset_prediction import AssetPredictionConfig
 from ml4t.models.types import AssetSignalResult, CrossSectionBatch, FitSummary
 
 

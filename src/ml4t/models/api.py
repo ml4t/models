@@ -19,6 +19,16 @@ from ml4t.models.types import (
 
 PanelBatch = PersistentPanelBatch | CrossSectionBatch
 
+__all__ = [
+    "AssetMapper",
+    "AssetPredictionModel",
+    "FactorForecaster",
+    "LatentFactorModel",
+    "PortfolioModel",
+    "PortfolioPostprocessor",
+    "StochasticDiscountFactorEstimator",
+]
+
 
 class LatentFactorModel(Protocol):
     """Protocol for structural latent-factor estimators."""
@@ -120,5 +130,5 @@ class StochasticDiscountFactorEstimator(Protocol):
         self,
         batch: CrossSectionBatch,
         *,
-        checkpoint: int | None = None,
+        checkpoint: tuple[str, int] | int | None = None,
     ) -> StochasticDiscountFactorState: ...
