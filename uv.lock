@@ -754,17 +754,9 @@ dependencies = [
 
 [package.optional-dependencies]
 all = [
-    { name = "mkdocs" },
-    { name = "mkdocs-material" },
-    { name = "mkdocstrings", extra = ["python"] },
     { name = "ml4t-specs" },
     { name = "polars" },
-    { name = "pre-commit" },
-    { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "ruff" },
     { name = "torch" },
-    { name = "ty" },
 ]
 deep = [
     { name = "torch" },
@@ -800,29 +792,21 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "mkdocs", marker = "extra == 'all'", specifier = ">=1.6,<2" },
     { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.6,<2" },
-    { name = "mkdocs-material", marker = "extra == 'all'", specifier = ">=9.5.0" },
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.5.0" },
-    { name = "mkdocstrings", extras = ["python"], marker = "extra == 'all'", specifier = ">=0.24.0" },
     { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.24.0" },
     { name = "ml4t-specs", marker = "extra == 'all'", specifier = ">=0.1.0b0" },
     { name = "ml4t-specs", marker = "extra == 'integration'", specifier = ">=0.1.0b0" },
     { name = "numpy", specifier = ">=1.26,<2.6" },
     { name = "polars", marker = "extra == 'all'", specifier = ">=1.0.0" },
     { name = "polars", marker = "extra == 'integration'", specifier = ">=1.0.0" },
-    { name = "pre-commit", marker = "extra == 'all'", specifier = ">=3.3.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.3.0" },
-    { name = "pytest", marker = "extra == 'all'", specifier = ">=8.0.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
-    { name = "pytest-cov", marker = "extra == 'all'", specifier = ">=5.0.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0.3" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0.0" },
-    { name = "ruff", marker = "extra == 'all'", specifier = ">=0.8.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },
-    { name = "torch", marker = "extra == 'all'", specifier = ">=2.4" },
-    { name = "torch", marker = "extra == 'deep'", specifier = ">=2.4" },
-    { name = "torch", marker = "extra == 'dev'", specifier = ">=2.4" },
-    { name = "ty", marker = "extra == 'all'" },
+    { name = "torch", marker = "extra == 'all'", specifier = ">=2.11.0" },
+    { name = "torch", marker = "extra == 'deep'", specifier = ">=2.11.0" },
+    { name = "torch", marker = "extra == 'dev'", specifier = ">=2.11.0" },
     { name = "ty", marker = "extra == 'dev'" },
 ]
 provides-extras = ["all", "deep", "dev", "docs", "integration"]
@@ -830,10 +814,10 @@ provides-extras = ["all", "deep", "dev", "docs", "integration"]
 [package.metadata.requires-dev]
 dev = [
     { name = "pre-commit", specifier = ">=3.3.0" },
-    { name = "pytest", specifier = ">=8.0.0" },
+    { name = "pytest", specifier = ">=9.0.3" },
     { name = "pytest-cov", specifier = ">=5.0.0" },
     { name = "ruff", specifier = ">=0.8.0" },
-    { name = "torch", specifier = ">=2.4" },
+    { name = "torch", specifier = ">=2.11.0" },
     { name = "twine", specifier = ">=6.0.0" },
     { name = "ty" },
 ]

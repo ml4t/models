@@ -64,19 +64,19 @@ dependencies = [
 
 [project.optional-dependencies]
 deep = [
-    "torch>=2.4",
+    "torch>=2.11.0",
 ]
 integration = [
     "polars>=1.0.0",
     "ml4t-specs>=0.1.0b0",
 ]
 dev = [
-    "pytest>=8.0.0",
+    "pytest>=9.0.3",
     "pytest-cov>=5.0.0",
     "ruff>=0.8.0",
     "ty",
     "pre-commit>=3.3.0",
-    "torch>=2.4",
+    "torch>=2.11.0",
 ]
 docs = [
     "mkdocs>=1.6,<2",
@@ -84,7 +84,7 @@ docs = [
     "mkdocstrings[python]>=0.24.0",
 ]
 all = [
-    "ml4t-models[deep,dev,docs,integration]",
+    "ml4t-models[deep,integration]",
 ]
 
 [project.urls]
@@ -96,12 +96,12 @@ Changelog = "https://github.com/ml4t/models/blob/main/CHANGELOG.md"
 
 [dependency-groups]
 dev = [
-    "pytest>=8.0.0",
+    "pytest>=9.0.3",
     "pytest-cov>=5.0.0",
     "ruff>=0.8.0",
     "ty",
     "pre-commit>=3.3.0",
-    "torch>=2.4",
+    "torch>=2.11.0",
     "twine>=6.0.0",
 ]
 
