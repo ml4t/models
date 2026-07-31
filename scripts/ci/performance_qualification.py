@@ -13,7 +13,7 @@ import tempfile
 import time
 import warnings
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, cast
 
@@ -61,6 +61,7 @@ class Profile:
     windows: int = 0
     sequence: int = 0
     iterations: int = 0
+    phase_epochs: tuple[int, int, int] = (1, 1, 1)
 
 
 CANONICAL = {
@@ -68,7 +69,7 @@ CANONICAL = {
     "rp_pca": Profile(4_700, 59, 0, factors=5),
     "ipca": Profile(500, 100, 10, factors=3),
     "cae": Profile(500, 500, 46, factors=5, epochs=200, ensemble=5),
-    "sdf": Profile(500, 200, 46),
+    "sdf": Profile(500, 200, 46, phase_epochs=(512, 64, 2_048)),
     "sae": Profile(500, 300, 46, epochs=25),
     "linear_portfolio": Profile(0, 200, 17, windows=16, sequence=63),
     "lstm_portfolio": Profile(0, 200, 17, windows=16, sequence=63, iterations=5),
@@ -86,6 +87,107 @@ SMOKE = {
     "lstm_portfolio": Profile(0, 3, 2, windows=2, sequence=4, iterations=1),
     "deep_portfolio": Profile(0, 3, 2, windows=2, sequence=4, iterations=1),
 }
+
+SCALING = {
+    "pca_assets": (
+        "pca",
+        Profile(1_000, 100, 0, factors=5),
+        Profile(1_000, 200, 0, factors=5),
+    ),
+    "rp_pca_assets": (
+        "rp_pca",
+        Profile(1_000, 100, 0, factors=5),
+        Profile(1_000, 200, 0, factors=5),
+    ),
+    "ipca_assets": (
+        "ipca",
+        Profile(200, 50, 10, factors=3),
+        Profile(200, 100, 10, factors=3),
+    ),
+    "cae_periods": (
+        "cae",
+        Profile(128, 128, 16, factors=5, epochs=10),
+        Profile(256, 128, 16, factors=5, epochs=10),
+    ),
+    "cae_assets": (
+        "cae",
+        Profile(128, 128, 16, factors=5, epochs=10),
+        Profile(128, 256, 16, factors=5, epochs=10),
+    ),
+    "cae_epochs": (
+        "cae",
+        Profile(128, 128, 16, factors=5, epochs=10),
+        Profile(128, 128, 16, factors=5, epochs=20),
+    ),
+    "cae_ensemble": (
+        "cae",
+        Profile(128, 128, 16, factors=5, epochs=10),
+        Profile(128, 128, 16, factors=5, epochs=10, ensemble=2),
+    ),
+    "sdf_periods": (
+        "sdf",
+        Profile(128, 64, 16, phase_epochs=(16, 4, 32)),
+        Profile(256, 64, 16, phase_epochs=(16, 4, 32)),
+    ),
+    "sdf_assets": (
+        "sdf",
+        Profile(128, 64, 16, phase_epochs=(16, 4, 32)),
+        Profile(128, 128, 16, phase_epochs=(16, 4, 32)),
+    ),
+    "sdf_epochs": (
+        "sdf",
+        Profile(128, 64, 16, phase_epochs=(16, 4, 32)),
+        Profile(128, 64, 16, phase_epochs=(32, 8, 64)),
+    ),
+    "sae_periods": (
+        "sae",
+        Profile(128, 128, 16, epochs=5),
+        Profile(256, 128, 16, epochs=5),
+    ),
+    "sae_assets": (
+        "sae",
+        Profile(128, 128, 16, epochs=5),
+        Profile(128, 256, 16, epochs=5),
+    ),
+    "sae_epochs": (
+        "sae",
+        Profile(128, 128, 16, epochs=5),
+        Profile(128, 128, 16, epochs=10),
+    ),
+    "lstm_assets": (
+        "lstm_portfolio",
+        Profile(0, 50, 17, windows=8, sequence=21, iterations=3),
+        Profile(0, 100, 17, windows=8, sequence=21, iterations=3),
+    ),
+    "lstm_sequence": (
+        "lstm_portfolio",
+        Profile(0, 50, 17, windows=8, sequence=21, iterations=3),
+        Profile(0, 50, 17, windows=8, sequence=42, iterations=3),
+    ),
+    "lstm_iterations": (
+        "lstm_portfolio",
+        Profile(0, 50, 17, windows=8, sequence=21, iterations=3),
+        Profile(0, 50, 17, windows=8, sequence=21, iterations=6),
+    ),
+    "deep_assets": (
+        "deep_portfolio",
+        Profile(0, 50, 17, windows=8, sequence=21, iterations=3),
+        Profile(0, 100, 17, windows=8, sequence=21, iterations=3),
+    ),
+    "deep_sequence": (
+        "deep_portfolio",
+        Profile(0, 50, 17, windows=8, sequence=21, iterations=3),
+        Profile(0, 50, 17, windows=8, sequence=42, iterations=3),
+    ),
+    "deep_iterations": (
+        "deep_portfolio",
+        Profile(0, 50, 17, windows=8, sequence=21, iterations=3),
+        Profile(0, 50, 17, windows=8, sequence=21, iterations=6),
+    ),
+}
+
+MAX_SCALING_RATIO = 16.0
+SCALING_SECONDS_ALLOWANCE = 0.25
 
 TIME_LIMITS = {
     "pca": 50.0,
@@ -327,7 +429,7 @@ def _sdf(
     profile: Profile, device: str, directory: Path, enforce: bool
 ) -> tuple[dict[str, Any], np.ndarray]:
     batch = _cross_section(profile)
-    epochs = (512, 64, 2_048) if enforce else (1, 1, 1)
+    epochs = profile.phase_epochs
     model = StochasticDiscountFactorModel(
         StochasticDiscountFactorConfig(
             state_dim_sdf=32 if enforce else 2,
@@ -470,6 +572,68 @@ def _deep_portfolio(
     )
 
 
+def _run_profile(
+    name: str,
+    profile: Profile,
+    device: str,
+    directory: Path,
+    enforce: bool,
+) -> tuple[dict[str, Any], np.ndarray]:
+    directory.mkdir(parents=True, exist_ok=True)
+    if name == "pca":
+        return _pca(profile, directory, enforce)
+    if name == "rp_pca":
+        return _rp_pca(profile, directory, enforce)
+    if name == "ipca":
+        return _ipca(profile, directory, enforce)
+    if name == "cae":
+        return _cae(profile, device, directory, enforce)
+    if name == "sdf":
+        return _sdf(profile, device, directory, enforce)
+    if name == "sae":
+        return _sae(profile, device, directory, enforce)
+    if name == "linear_portfolio":
+        return _linear_portfolio(profile, directory, enforce)
+    if name == "lstm_portfolio":
+        return _lstm_portfolio(profile, device, directory, enforce)
+    if name == "deep_portfolio":
+        return _deep_portfolio(profile, device, directory, enforce)
+    raise ValueError(f"unknown performance profile model: {name}")
+
+
+def _scaling_profiles(
+    device: str,
+    directory: Path,
+) -> tuple[dict[str, tuple[dict[str, Any], np.ndarray]], dict[str, Any]]:
+    measured: dict[str, tuple[dict[str, Any], np.ndarray]] = {}
+    comparisons: dict[str, Any] = {}
+    warmed: set[str] = set()
+    for probe, (model_name, baseline, scaled) in SCALING.items():
+        if model_name not in warmed:
+            _run_profile(model_name, baseline, device, directory / f"warm-{model_name}", False)
+            warmed.add(model_name)
+        for level, profile in (("baseline", baseline), ("scaled", scaled)):
+            key = f"{probe}_{level}"
+            result = _run_profile(model_name, profile, device, directory / key, False)
+            result[0]["workload"] = asdict(profile)
+            measured[key] = result
+        baseline_seconds = measured[f"{probe}_baseline"][0]["fit_seconds"]
+        scaled_seconds = measured[f"{probe}_scaled"][0]["fit_seconds"]
+        limit = baseline_seconds * MAX_SCALING_RATIO + SCALING_SECONDS_ALLOWANCE
+        if scaled_seconds > limit:
+            raise AssertionError(
+                f"{probe} scaled fit exceeded bounded-growth limit: "
+                f"expected <= {limit}s, got {scaled_seconds}s"
+            )
+        comparisons[probe] = {
+            "baseline_fit_seconds": baseline_seconds,
+            "fit_ratio": scaled_seconds / baseline_seconds,
+            "model": model_name,
+            "scaled_fit_seconds": scaled_seconds,
+        }
+    return measured, comparisons
+
+
 def qualify(profile_name: str, device: str) -> tuple[dict[str, Any], dict[str, np.ndarray]]:
     if device == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("canonical CUDA performance qualification requires CUDA")
@@ -477,21 +641,14 @@ def qualify(profile_name: str, device: str) -> tuple[dict[str, Any], dict[str, n
     enforce = profile_name == "canonical"
     with tempfile.TemporaryDirectory(prefix="ml4t-models-performance-") as temp_dir:
         directory = Path(temp_dir)
-        measured = {
-            "pca": _pca(profiles["pca"], directory, enforce),
-            "rp_pca": _rp_pca(profiles["rp_pca"], directory, enforce),
-            "ipca": _ipca(profiles["ipca"], directory, enforce),
-            "cae": _cae(profiles["cae"], device, directory, enforce),
-            "sdf": _sdf(profiles["sdf"], device, directory, enforce),
-            "sae": _sae(profiles["sae"], device, directory, enforce),
-            "linear_portfolio": _linear_portfolio(profiles["linear_portfolio"], directory, enforce),
-            "lstm_portfolio": _lstm_portfolio(
-                profiles["lstm_portfolio"], device, directory, enforce
-            ),
-            "deep_portfolio": _deep_portfolio(
-                profiles["deep_portfolio"], device, directory, enforce
-            ),
-        }
+        if profile_name == "scaling":
+            measured, scaling = _scaling_profiles(device, directory)
+        else:
+            measured = {
+                name: _run_profile(name, profile, device, directory / name, enforce)
+                for name, profile in profiles.items()
+            }
+            scaling = None
     results = {name: value[0] for name, value in measured.items()}
     arrays = {name: value[1] for name, value in measured.items()}
     return (
@@ -515,6 +672,7 @@ def qualify(profile_name: str, device: str) -> tuple[dict[str, Any], dict[str, n
             },
             "profile": profile_name,
             "results": results,
+            "scaling": scaling,
         },
         arrays,
     )
@@ -522,7 +680,7 @@ def qualify(profile_name: str, device: str) -> tuple[dict[str, Any], dict[str, n
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--profile", choices=("smoke", "canonical"), required=True)
+    parser.add_argument("--profile", choices=("smoke", "canonical", "scaling"), required=True)
     parser.add_argument("--device", choices=("cpu", "cuda"), required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--arrays", type=Path, required=True)

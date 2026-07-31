@@ -415,6 +415,11 @@ jobs:
               --device cuda \
               --output "performance-${repetition}.json" \
               --arrays "performance-${repetition}.npz"
+            .cuda-venv/bin/python scripts/ci/performance_qualification.py \
+              --profile scaling \
+              --device cuda \
+              --output "scaling-${repetition}.json" \
+              --arrays "scaling-${repetition}.npz"
           done
 
       - name: Check performance and replay limits
@@ -422,6 +427,12 @@ jobs:
           .cuda-venv/bin/python scripts/ci/check_performance.py
           --records performance-1.json performance-2.json performance-3.json
           --arrays performance-1.npz performance-2.npz performance-3.npz
+
+      - name: Check scaling stability and replay limits
+        run: >-
+          .cuda-venv/bin/python scripts/ci/check_performance.py
+          --records scaling-1.json scaling-2.json scaling-3.json
+          --arrays scaling-1.npz scaling-2.npz scaling-3.npz
 
       - name: Upload CUDA and performance evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -431,6 +442,8 @@ jobs:
             cuda-qualification.json
             performance-*.json
             performance-*.npz
+            scaling-*.json
+            scaling-*.npz
           if-no-files-found: error
 
   qualify:

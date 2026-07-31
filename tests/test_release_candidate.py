@@ -151,6 +151,11 @@ def test_performance_profiles_cover_representative_public_model_families() -> No
 
     assert set(performance_qualification.CANONICAL) == expected
     assert set(performance_qualification.SMOKE) == expected
+    assert {
+        probe.rsplit("_", maxsplit=1)[-1]
+        for probe in performance_qualification.SCALING
+        if probe.startswith(("cae_", "sdf_", "sae_", "lstm_", "deep_"))
+    } >= {"assets", "periods", "epochs", "ensemble", "sequence", "iterations"}
 
 
 def test_hardware_qualification_separates_replay_and_cpu_recovery_tolerances() -> None:
