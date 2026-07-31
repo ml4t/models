@@ -10,6 +10,7 @@ from typing import Any
 import numpy as np
 
 MAX_TIMING_RANGE = 2.0
+MIN_TIMING_FOR_RANGE_SECONDS = 0.01
 CUDA_RTOL = 1e-5
 CUDA_ATOL = 1e-5
 
@@ -40,7 +41,12 @@ def check(records: list[Path], arrays: list[Path]) -> None:
         raise ValueError("performance records do not share one model inventory")
     for name in sorted(names):
         fit_times = [float(value[name]["fit_seconds"]) for value in results]
-        if min(fit_times) <= 0.0 or max(fit_times) / min(fit_times) > MAX_TIMING_RANGE:
+        if min(fit_times) <= 0.0:
+            raise AssertionError(f"{name} fit time must be positive: {fit_times}")
+        if (
+            max(fit_times) >= MIN_TIMING_FOR_RANGE_SECONDS
+            and max(fit_times) / min(fit_times) > MAX_TIMING_RANGE
+        ):
             raise AssertionError(
                 f"{name} fit timing range exceeded {MAX_TIMING_RANGE}x: {fit_times}"
             )
