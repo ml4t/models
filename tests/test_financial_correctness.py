@@ -343,6 +343,58 @@ def test_portfolio_constraints_are_satisfied_jointly() -> None:
     assert np.abs(constrained).max() <= 0.3 + 1e-10
 
 
+def test_uncapped_portfolio_normalization_preserves_score_order_and_exposures() -> None:
+    raw = np.array([[[3.0, 1.0, -2.0, -4.0]]])
+
+    constrained = normalize_cross_sectional_weights(
+        raw,
+        mask=np.ones_like(raw, dtype=bool),
+        gross_exposure=1.0,
+        net_exposure=0.2,
+        max_abs_weight=None,
+    )
+
+    assert np.abs(constrained).sum() == pytest.approx(1.0, abs=1e-12)
+    assert constrained.sum() == pytest.approx(0.2, abs=1e-12)
+    assert np.array_equal(np.argsort(constrained[0, 0]), np.argsort(raw[0, 0]))
+
+
+@pytest.mark.parametrize(
+    ("net_exposure", "expected"),
+    [
+        (0.0, np.array([-0.25, -0.25, 0.25, 0.25])),
+        (1.0, np.full(4, 0.25)),
+        (-1.0, np.full(4, -0.25)),
+    ],
+)
+def test_uncapped_constant_scores_have_deterministic_exposure(
+    net_exposure: float,
+    expected: np.ndarray,
+) -> None:
+    raw = np.ones((1, 1, 4))
+
+    constrained = normalize_cross_sectional_weights(
+        raw,
+        mask=np.ones_like(raw, dtype=bool),
+        gross_exposure=1.0,
+        net_exposure=net_exposure,
+        max_abs_weight=None,
+    )
+
+    np.testing.assert_allclose(constrained[0, 0], expected)
+
+
+def test_uncapped_long_short_request_rejects_one_available_asset() -> None:
+    with pytest.raises(ValueError, match="available assets cannot support"):
+        normalize_cross_sectional_weights(
+            np.ones((1, 1, 1)),
+            mask=np.ones((1, 1, 1), dtype=bool),
+            gross_exposure=1.0,
+            net_exposure=0.0,
+            max_abs_weight=None,
+        )
+
+
 def test_portfolio_constraints_reject_infeasible_request() -> None:
     with pytest.raises(ValueError, match="infeasible portfolio constraints"):
         normalize_cross_sectional_weights(

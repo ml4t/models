@@ -104,7 +104,9 @@ def _project_weight_row(
 ) -> np.ndarray:
     long_total = 0.5 * (gross_exposure + net_exposure)
     short_total = 0.5 * (gross_exposure - net_exposure)
-    cap = max_abs_weight if max_abs_weight is not None else max(gross_exposure, 1.0)
+    if max_abs_weight is None:
+        return _normalize_uncapped_weight_row(values, long_total, short_total)
+    cap = max_abs_weight
     order = np.argsort(values, kind="stable")
     best: np.ndarray | None = None
     best_error = float("inf")
@@ -135,9 +137,45 @@ def _project_weight_row(
     return best
 
 
+def _normalize_uncapped_weight_row(
+    values: np.ndarray,
+    long_total: float,
+    short_total: float,
+) -> np.ndarray:
+    if values.size < int(long_total > 0.0) + int(short_total > 0.0):
+        raise ValueError(
+            "infeasible portfolio constraints: available assets cannot support "
+            f"long={long_total} and short={short_total}"
+        )
+    centered = values - np.mean(values)
+    positive = np.maximum(centered, 0.0)
+    negative = np.maximum(-centered, 0.0)
+    positive_total = float(positive.sum())
+    negative_total = float(negative.sum())
+    if positive_total > 0.0 and negative_total > 0.0:
+        return positive * (long_total / positive_total) - negative * (short_total / negative_total)
+
+    normalized = np.zeros_like(values)
+    if long_total == 0.0:
+        normalized.fill(-short_total / values.size)
+        return normalized
+    if short_total == 0.0:
+        normalized.fill(long_total / values.size)
+        return normalized
+
+    long_count = int(round(values.size * long_total / (long_total + short_total)))
+    long_count = min(max(long_count, 1), values.size - 1)
+    order = np.argsort(values, kind="stable")
+    normalized[order[:-long_count]] = -short_total / (values.size - long_count)
+    normalized[order[-long_count:]] = long_total / long_count
+    return normalized
+
+
 def _project_capped_simplex(values: np.ndarray, total: float, cap: float) -> np.ndarray:
     if total <= 0.0:
         return np.zeros_like(values)
+    if cap >= total:
+        return _project_simplex(values, total)
     lower = float(np.min(values - cap))
     upper = float(np.max(values))
     for _ in range(100):
@@ -157,6 +195,17 @@ def _project_capped_simplex(values: np.ndarray, total: float, cap: float) -> np.
             if residual <= 1e-14:
                 break
     return projected
+
+
+def _project_simplex(values: np.ndarray, total: float) -> np.ndarray:
+    if values.size == 0:
+        return np.zeros_like(values)
+    descending = np.sort(values)[::-1]
+    cumulative = np.cumsum(descending) - total
+    candidates = descending - cumulative / np.arange(1, values.size + 1) > 0.0
+    active = int(np.flatnonzero(candidates)[-1])
+    threshold = cumulative[active] / (active + 1)
+    return np.maximum(values - threshold, 0.0)
 
 
 def apply_turnover_limit(
