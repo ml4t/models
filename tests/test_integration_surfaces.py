@@ -154,7 +154,9 @@ def test_write_backtest_frames_uses_standard_artifact_names(
 
     def _write_parquet(self, path, *, compression="zstd"):
         written_paths.append(f"{Path(path).name}:{compression}")
-        return Path(path)
+        output = Path(path)
+        output.write_bytes(b"parquet")
+        return output
 
     from pathlib import Path
 
@@ -171,3 +173,125 @@ def test_write_backtest_frames_uses_standard_artifact_names(
     assert set(written) == {"predictions", "weights"}
     assert "predictions.parquet:zstd" in written_paths
     assert "weights.parquet:zstd" in written_paths
+    assert (tmp_path / "manifest.json").is_file()
+
+
+def test_write_backtest_frames_removes_omitted_stale_outputs(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    predictions_frame = predictions_frame_from_asset_forecast(
+        AssetForecastResult(expected_returns=np.array([[0.1]], dtype=np.float64))
+    )
+    weights_frame = weights_frame_from_portfolio_weights(
+        PortfolioWeightsResult(weights=np.array([[[0.2]]], dtype=np.float64))
+    )
+
+    def _write_parquet(self, path, *, compression="zstd"):
+        del self, compression
+        output = Path(path)
+        output.write_bytes(output.name.encode())
+        return output
+
+    from pathlib import Path
+
+    monkeypatch.setattr(
+        "ml4t.models.integration.surfaces.ResultsFrame.write_parquet",
+        _write_parquet,
+    )
+    output_dir = tmp_path / "artifacts"
+    write_backtest_frames(output_dir, predictions=predictions_frame, weights=weights_frame)
+
+    write_backtest_frames(output_dir, predictions=predictions_frame)
+
+    assert (output_dir / "predictions.parquet").is_file()
+    assert not (output_dir / "weights.parquet").exists()
+
+
+def test_write_backtest_frames_preserves_prior_generation_on_write_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    predictions_frame = predictions_frame_from_asset_forecast(
+        AssetForecastResult(expected_returns=np.array([[0.1]], dtype=np.float64))
+    )
+    weights_frame = weights_frame_from_portfolio_weights(
+        PortfolioWeightsResult(weights=np.array([[[0.2]]], dtype=np.float64))
+    )
+    output_dir = tmp_path / "artifacts"
+    output_dir.mkdir()
+    (output_dir / "predictions.parquet").write_bytes(b"old predictions")
+    (output_dir / "weights.parquet").write_bytes(b"old weights")
+    (output_dir / "manifest.json").write_text("old manifest", encoding="utf-8")
+
+    def _fail_second_write(self, path, *, compression="zstd"):
+        del self, compression
+        output = Path(path)
+        if output.name == "weights.parquet":
+            raise OSError("injected write failure")
+        output.write_bytes(b"new predictions")
+        return output
+
+    from pathlib import Path
+
+    monkeypatch.setattr(
+        "ml4t.models.integration.surfaces.ResultsFrame.write_parquet",
+        _fail_second_write,
+    )
+
+    with pytest.raises(OSError, match="injected write failure"):
+        write_backtest_frames(
+            output_dir,
+            predictions=predictions_frame,
+            weights=weights_frame,
+        )
+
+    assert (output_dir / "predictions.parquet").read_bytes() == b"old predictions"
+    assert (output_dir / "weights.parquet").read_bytes() == b"old weights"
+    assert (output_dir / "manifest.json").read_text(encoding="utf-8") == "old manifest"
+
+
+def test_write_backtest_frames_restores_prior_generation_on_publish_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    import os
+
+    predictions_frame = predictions_frame_from_asset_forecast(
+        AssetForecastResult(expected_returns=np.array([[0.1]], dtype=np.float64))
+    )
+    output_dir = tmp_path / "artifacts"
+    output_dir.mkdir()
+    (output_dir / "predictions.parquet").write_bytes(b"old predictions")
+    (output_dir / "manifest.json").write_text("old manifest", encoding="utf-8")
+
+    def _write_parquet(self, path, *, compression="zstd"):
+        del self, compression
+        output = Path(path)
+        output.write_bytes(b"new predictions")
+        return output
+
+    real_replace = os.replace
+    failed = False
+
+    def _fail_publish(source, destination):
+        nonlocal failed
+        source_path = Path(source)
+        if not failed and source_path.name.startswith(".artifacts.staging-"):
+            failed = True
+            raise OSError("injected publish failure")
+        return real_replace(source, destination)
+
+    from pathlib import Path
+
+    monkeypatch.setattr(
+        "ml4t.models.integration.surfaces.ResultsFrame.write_parquet",
+        _write_parquet,
+    )
+    monkeypatch.setattr("ml4t.models.integration.surfaces.os.replace", _fail_publish)
+
+    with pytest.raises(OSError, match="injected publish failure"):
+        write_backtest_frames(output_dir, predictions=predictions_frame)
+
+    assert (output_dir / "predictions.parquet").read_bytes() == b"old predictions"
+    assert (output_dir / "manifest.json").read_text(encoding="utf-8") == "old manifest"
