@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -8,6 +10,7 @@ from ml4t.models import (
     AssetSignalResult,
     AssetWeightsResult,
     PortfolioWeightsResult,
+    ResultsFrame,
     context_frame_from_weights,
     predictions_frame_from_asset_forecast,
     predictions_frame_from_asset_signal,
@@ -17,6 +20,18 @@ from ml4t.models import (
     weights_frame_from_portfolio_weights,
     write_backtest_frames,
 )
+from ml4t.models.integration import surfaces as surfaces_module
+
+
+def test_results_frame_columnar_polars_and_parquet_exports(tmp_path: Path) -> None:
+    frame = ResultsFrame(columns=("a", "b"), rows=((1, "x"), (2, "y")))
+
+    assert frame.to_columnar() == {"a": [1, 2], "b": ["x", "y"]}
+    assert frame.to_polars().to_dicts() == [{"a": 1, "b": "x"}, {"a": 2, "b": "y"}]
+
+    output = frame.write_parquet(tmp_path / "nested" / "frame.parquet", compression="snappy")
+
+    assert output.is_file()
 
 
 def test_predictions_frame_uses_diagnostic_column_names() -> None:
@@ -127,6 +142,23 @@ def test_context_frame_from_weights_builds_wide_context_frame() -> None:
     assert frame.metadata["frame_type"] == "context"
 
 
+def test_context_frame_from_portfolio_weights_records_checkpoint_and_fills_nan() -> None:
+    weights = PortfolioWeightsResult(
+        weights=np.array([[[0.4, np.nan]]]),
+        checkpoint_step=7,
+    )
+
+    frame = context_frame_from_weights(weights)
+
+    assert frame.to_dicts() == [{"timestamp": 0, "w_asset_0": 0.4, "w_asset_1": 0.0}]
+    assert frame.metadata["checkpoint_step"] == 7
+
+
+def test_context_frame_rejects_multiple_portfolio_batches() -> None:
+    with pytest.raises(ValueError, match="requires a single portfolio-weight batch"):
+        context_frame_from_weights(PortfolioWeightsResult(weights=np.ones((2, 1, 1))))
+
+
 def test_frame_to_polars_requires_optional_dependency(monkeypatch: pytest.MonkeyPatch) -> None:
     frame = weights_frame_from_portfolio_weights(
         PortfolioWeightsResult(weights=np.array([[[0.1]]], dtype=np.float64))
@@ -157,8 +189,6 @@ def test_write_backtest_frames_uses_standard_artifact_names(
         output = Path(path)
         output.write_bytes(b"parquet")
         return output
-
-    from pathlib import Path
 
     monkeypatch.setattr(
         "ml4t.models.integration.surfaces.ResultsFrame.write_parquet",
@@ -192,8 +222,6 @@ def test_write_backtest_frames_removes_omitted_stale_outputs(
         output = Path(path)
         output.write_bytes(output.name.encode())
         return output
-
-    from pathlib import Path
 
     monkeypatch.setattr(
         "ml4t.models.integration.surfaces.ResultsFrame.write_parquet",
@@ -231,8 +259,6 @@ def test_write_backtest_frames_preserves_prior_generation_on_write_failure(
             raise OSError("injected write failure")
         output.write_bytes(b"new predictions")
         return output
-
-    from pathlib import Path
 
     monkeypatch.setattr(
         "ml4t.models.integration.surfaces.ResultsFrame.write_parquet",
@@ -282,8 +308,6 @@ def test_write_backtest_frames_restores_prior_generation_on_publish_failure(
             raise OSError("injected publish failure")
         return real_replace(source, destination)
 
-    from pathlib import Path
-
     monkeypatch.setattr(
         "ml4t.models.integration.surfaces.ResultsFrame.write_parquet",
         _write_parquet,
@@ -295,3 +319,59 @@ def test_write_backtest_frames_restores_prior_generation_on_publish_failure(
 
     assert (output_dir / "predictions.parquet").read_bytes() == b"old predictions"
     assert (output_dir / "manifest.json").read_text(encoding="utf-8") == "old manifest"
+
+
+def test_weight_frames_skip_nonfinite_values() -> None:
+    asset_frame = weights_frame_from_asset_weights(
+        AssetWeightsResult(weights=np.array([[0.1, np.nan]]))
+    )
+    portfolio_frame = weights_frame_from_portfolio_weights(
+        PortfolioWeightsResult(weights=np.array([[[0.1, np.nan]]]))
+    )
+
+    assert len(asset_frame.rows) == 1
+    assert len(portfolio_frame.rows) == 1
+
+
+def test_write_backtest_frames_rejects_file_target(tmp_path: Path) -> None:
+    target = tmp_path / "artifact"
+    target.write_text("not a directory", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="artifact_dir must be a directory"):
+        write_backtest_frames(target)
+
+
+def test_write_backtest_frames_rejects_writer_without_output(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    frame = predictions_frame_from_asset_forecast(
+        AssetForecastResult(expected_returns=np.array([[0.1]]))
+    )
+
+    def do_not_write(self: object, path: str | Path, *, compression: str = "zstd") -> Path:
+        del self, compression
+        return Path(path)
+
+    monkeypatch.setattr(
+        "ml4t.models.integration.surfaces.ResultsFrame.write_parquet",
+        do_not_write,
+    )
+
+    with pytest.raises(OSError, match="writer did not create"):
+        write_backtest_frames(tmp_path / "artifacts", predictions=frame)
+
+
+def test_publish_failure_without_prior_generation_cleans_staging(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    output = tmp_path / "output"
+
+    def fail_replace(source: object, destination: object) -> None:
+        raise OSError(f"cannot replace {source} with {destination}")
+
+    monkeypatch.setattr(surfaces_module.os, "replace", fail_replace)
+
+    with pytest.raises(OSError, match="cannot replace"):
+        surfaces_module._publish_generation(staging, output)
