@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import json
+import os
+import shutil
+import tempfile
 from dataclasses import dataclass, field
 from importlib import import_module
 from pathlib import Path
@@ -252,22 +256,63 @@ def write_backtest_frames(
     weights: WeightsFrame | None = None,
     compression: str = "zstd",
 ) -> dict[str, Path]:
-    """Write standardized prediction and weight artifacts for downstream ML4T tooling."""
+    """Atomically replace one complete generation of backtest frame artifacts."""
 
     output_dir = Path(artifact_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    written: dict[str, Path] = {}
+    if output_dir.exists() and not output_dir.is_dir():
+        raise ValueError(f"artifact_dir must be a directory; got {output_dir}")
+    output_dir.parent.mkdir(parents=True, exist_ok=True)
+    staging_dir = Path(
+        tempfile.mkdtemp(prefix=f".{output_dir.name}.staging-", dir=output_dir.parent)
+    )
+    requested: dict[str, ResultsFrame] = {}
     if predictions is not None:
-        written["predictions"] = predictions.write_parquet(
-            output_dir / "predictions.parquet",
-            compression=compression,
-        )
+        requested["predictions"] = predictions
     if weights is not None:
-        written["weights"] = weights.write_parquet(
-            output_dir / "weights.parquet",
-            compression=compression,
+        requested["weights"] = weights
+
+    try:
+        for name, frame in requested.items():
+            staged_path = staging_dir / f"{name}.parquet"
+            frame.write_parquet(staged_path, compression=compression)
+            if not staged_path.is_file():
+                raise OSError(f"{name} frame writer did not create {staged_path}")
+        manifest_path = staging_dir / "manifest.json"
+        manifest_path.write_text(
+            json.dumps(
+                {
+                    "format_version": 1,
+                    "files": [f"{name}.parquet" for name in sorted(requested)],
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            ),
+            encoding="utf-8",
         )
-    return written
+        _publish_generation(staging_dir, output_dir)
+    except BaseException:
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        raise
+
+    return {name: output_dir / f"{name}.parquet" for name in requested}
+
+
+def _publish_generation(staging_dir: Path, output_dir: Path) -> None:
+    previous_dir: Path | None = None
+    if output_dir.exists():
+        previous_dir = Path(
+            tempfile.mkdtemp(prefix=f".{output_dir.name}.previous-", dir=output_dir.parent)
+        )
+        previous_dir.rmdir()
+        os.replace(output_dir, previous_dir)
+    try:
+        os.replace(staging_dir, output_dir)
+    except BaseException:
+        if previous_dir is not None and previous_dir.exists():
+            os.replace(previous_dir, output_dir)
+        raise
+    if previous_dir is not None:
+        shutil.rmtree(previous_dir, ignore_errors=True)
 
 
 def _frame_from_portfolio_weights[FrameT: SignalsFrame | WeightsFrame](

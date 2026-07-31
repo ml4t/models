@@ -19,6 +19,11 @@ from ml4t.models._internal.persistence import (
     save_artifact,
     unpack_tensor_tree,
 )
+from ml4t.models._internal.portfolio_validation import (
+    validate_portfolio_identity,
+    validate_portfolio_prediction_batch,
+    validate_portfolio_training_batch,
+)
 from ml4t.models._internal.torch_runtime import resolve_device, seed_torch
 from ml4t.models.configs import LSTMPortfolioConfig
 from ml4t.models.portfolio.base import BasePortfolioModel
@@ -28,9 +33,6 @@ from ml4t.models.portfolio.runtime import (
     fit_policy_network,
     group_ids_tensor,
     mask_tensor,
-    validate_portfolio_identity,
-    validate_portfolio_prediction_batch,
-    validate_portfolio_training_batch,
 )
 from ml4t.models.types import FitSummary, PortfolioSequenceBatch, PortfolioWeightsResult
 
