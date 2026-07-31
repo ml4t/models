@@ -115,7 +115,7 @@ def test_performance_checker_ignores_submeasurement_timing_noise(tmp_path: Path)
     records, arrays = _performance_inputs(tmp_path)
     for index, record in enumerate(records, start=1):
         value = json.loads(record.read_text(encoding="utf-8"))
-        value["results"]["model"]["fit_seconds"] = index * 0.001
+        value["results"]["model"]["fit_seconds"] = index * 0.02
         record.write_text(json.dumps(value), encoding="utf-8")
 
     check_performance.check(records, arrays)
