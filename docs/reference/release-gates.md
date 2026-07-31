@@ -37,6 +37,7 @@ The stable candidate requires all of these results:
 - reproducible wheel reconstruction on every stable operating-system and Python cell
 - RTX 3090 CUDA fit, replay, checkpoint, persistence, CPU recovery, and CUDA recovery checks
 - three fresh-process Chapter 14 performance runs on the CUDA reference host
+- three fresh-process isolated scaling profiles for classical and neural workload axes
 
 MPS runs the public neural workflow matrix on an Apple Silicon hosted runner. It remains a
 non-blocking compatibility result.

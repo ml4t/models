@@ -77,6 +77,7 @@ def test_ci_qualifies_one_candidate_across_required_platforms() -> None:
     assert "scripts/ci/performance_qualification.py" in workflow
     assert "scripts/ci/check_performance.py" in workflow
     assert "--profile canonical" in workflow
+    assert "--profile scaling" in workflow
     assert (
         "needs: [stable-platform, python-prerelease, dependency-audit, cuda-qualification]"
         in workflow
