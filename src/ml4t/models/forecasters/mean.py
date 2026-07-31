@@ -14,7 +14,7 @@ from ml4t.models._internal.persistence import (
     save_artifact,
 )
 from ml4t.models.configs import ExpandingMeanForecasterConfig
-from ml4t.models.forecasters.base import BaseFactorForecaster
+from ml4t.models.forecasters.base import BaseFactorForecaster, require_estimable_factor_returns
 from ml4t.models.types import FactorForecastResult, FitSummary, LatentFactorState
 
 
@@ -26,10 +26,12 @@ class ExpandingMeanFactorForecaster(BaseFactorForecaster[ExpandingMeanForecaster
         self._mean_factor_premium: np.ndarray | None = None
 
     def fit(self, state: LatentFactorState) -> FitSummary:
-        if state.factor_returns is None:
-            raise ValueError("ExpandingMeanFactorForecaster requires training factor_returns")
+        factors = require_estimable_factor_returns(state)
+        mean_factor_premium = np.nanmean(factors, axis=0)
+        if not np.isfinite(mean_factor_premium).all():
+            raise FloatingPointError("factor mean estimation produced non-finite output")
 
-        self._mean_factor_premium = np.nanmean(state.factor_returns, axis=0)
+        self._mean_factor_premium = mean_factor_premium
         self._mark_fitted()
         return FitSummary(
             converged=True,

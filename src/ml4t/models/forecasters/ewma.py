@@ -14,7 +14,7 @@ from ml4t.models._internal.persistence import (
     save_artifact,
 )
 from ml4t.models.configs import EWMABaseForecasterConfig
-from ml4t.models.forecasters.base import BaseFactorForecaster
+from ml4t.models.forecasters.base import BaseFactorForecaster, require_estimable_factor_returns
 from ml4t.models.types import FactorForecastResult, FitSummary, LatentFactorState
 
 
@@ -26,17 +26,21 @@ class EWMABaseFactorForecaster(BaseFactorForecaster[EWMABaseForecasterConfig]):
         self._ewma_level: np.ndarray | None = None
 
     def fit(self, state: LatentFactorState) -> FitSummary:
-        if state.factor_returns is None:
-            raise ValueError("EWMABaseFactorForecaster requires training factor_returns")
-
-        factors = np.asarray(state.factor_returns, dtype=np.float64)
-        half_life = max(float(self.config.half_life), 1.0)
+        factors = require_estimable_factor_returns(state)
+        half_life = float(self.config.half_life)
         alpha = 1.0 - np.exp(np.log(0.5) / half_life)
 
-        level = np.nanmean(factors[:1], axis=0)
-        for row in factors[1:]:
-            values = np.where(np.isfinite(row), row, level)
-            level = alpha * values + (1.0 - alpha) * level
+        level = np.zeros(factors.shape[1], dtype=np.float64)
+        initialized = np.zeros(factors.shape[1], dtype=bool)
+        for row in factors:
+            finite = np.isfinite(row)
+            first = finite & ~initialized
+            level[first] = row[first]
+            update = finite & initialized
+            level[update] = alpha * row[update] + (1.0 - alpha) * level[update]
+            initialized |= finite
+        if not np.isfinite(level).all():
+            raise FloatingPointError("EWMA estimation produced non-finite output")
 
         self._ewma_level = level
         self._mark_fitted()

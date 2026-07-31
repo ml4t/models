@@ -84,7 +84,12 @@ def test_pca_reorders_fitted_asset_state_by_identity() -> None:
 
 def test_pca_rejects_unknown_assets_and_checkpoints() -> None:
     model = PCAModel(PCAConfig(n_factors=1))
-    model.fit(PersistentPanelBatch(returns=np.ones((3, 2)), asset_ids=("A", "B")))
+    model.fit(
+        PersistentPanelBatch(
+            returns=np.array([[1.0, 1.0], [2.0, 1.0], [3.0, 2.0]]),
+            asset_ids=("A", "B"),
+        )
+    )
 
     with pytest.raises(ValueError, match="asset_ids"):
         model.extract(PersistentPanelBatch(timestamps=("t",), asset_ids=("A", "C")))
