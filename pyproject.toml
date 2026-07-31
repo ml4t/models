@@ -120,6 +120,7 @@ addopts = [
     "-ra",
     "--strict-markers",
     "--cov=ml4t.models",
+    "--cov-branch",
     "--cov-report=term-missing",
 ]
 markers = [

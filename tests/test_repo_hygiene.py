@@ -67,6 +67,8 @@ def test_ci_qualifies_one_candidate_across_required_platforms() -> None:
     assert "allow-prereleases: true" in workflow
     assert "name: release-candidate" in workflow
     assert "scripts/ci/test_wheel.py candidate" in workflow
+    assert "scripts/ci/check_coverage.py coverage.json" in workflow
+    assert "needs: [lint, typecheck, coverage, docs]" in workflow
 
 
 def test_release_promotes_qualified_candidate_without_rebuilding() -> None:
