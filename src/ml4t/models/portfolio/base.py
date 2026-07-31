@@ -4,16 +4,18 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
+from ml4t.models._internal.observability import FitObservable
 from ml4t.models.configs.portfolio import PortfolioConfig
 from ml4t.models.types import FitSummary, PortfolioSequenceBatch, PortfolioWeightsResult
 
 
-class BasePortfolioModel(ABC):
+class BasePortfolioModel(FitObservable, ABC):
     """Abstract base for end-to-end portfolio learners."""
 
     def __init__(self, config: PortfolioConfig) -> None:
         self.config = config
         self._is_fitted = False
+        self._last_fit_record = None
 
     @property
     def is_fitted(self) -> bool:

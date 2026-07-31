@@ -4,17 +4,19 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
+from ml4t.models._internal.observability import FitObservable
 from ml4t.models.api import PanelBatch
 from ml4t.models.configs.latent_factor import LatentFactorConfig
 from ml4t.models.types import FitSummary, LatentFactorState
 
 
-class BaseLatentFactorModel[ConfigT: LatentFactorConfig](ABC):
+class BaseLatentFactorModel[ConfigT: LatentFactorConfig](FitObservable, ABC):
     """Abstract base for structural latent-factor estimators."""
 
     def __init__(self, config: ConfigT) -> None:
         self.config = config
         self._is_fitted = False
+        self._last_fit_record = None
 
     @property
     def is_fitted(self) -> bool:

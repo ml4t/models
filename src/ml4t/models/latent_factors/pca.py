@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
+from ml4t.models._internal.observability import observed_fit
 from ml4t.models._internal.persistence import (
     load_artifact,
     load_config,
@@ -29,6 +30,7 @@ class PCAModel(BaseLatentFactorModel[PCAConfig]):
         self._train_factor_returns: np.ndarray | None = None
         self._asset_ids: tuple[str, ...] = ()
 
+    @observed_fit
     def fit(self, batch: PanelBatch) -> FitSummary:
         persistent = _require_persistent_panel(batch)
         if persistent.returns is None:

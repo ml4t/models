@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
+from ml4t.models._internal.observability import observed_fit
 from ml4t.models._internal.persistence import (
     load_artifact,
     load_config,
@@ -25,6 +26,7 @@ class ExpandingMeanFactorForecaster(BaseFactorForecaster[ExpandingMeanForecaster
         super().__init__(config or ExpandingMeanForecasterConfig())
         self._mean_factor_premium: np.ndarray | None = None
 
+    @observed_fit
     def fit(self, state: LatentFactorState) -> FitSummary:
         factors = require_estimable_factor_returns(state).astype(
             np.dtype(self.config.dtype), copy=False

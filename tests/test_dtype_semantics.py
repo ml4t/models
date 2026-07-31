@@ -23,6 +23,7 @@ from ml4t.models import (
     IPCAModel,
     LatentFactorState,
     LinearPortfolioConfig,
+    LinearStochasticDiscountFactorReturnMapper,
     LSTMPortfolioConfig,
     LSTMPortfolioModel,
     PCAConfig,
@@ -79,6 +80,16 @@ def _tensor_dtypes(value: Any) -> Iterable[torch.dtype]:
             yield from _tensor_dtypes(child)
 
 
+def _assert_run_record(model: Any, summary: Any, dtype: str) -> None:
+    record = summary.run_record
+    assert record is not None
+    assert record is model.last_fit_record
+    assert record.schema_version == 1
+    assert record.resolved_dtype == dtype
+    assert record.stopping_reason in {"completed", "converged", "iteration_limit"}
+    assert record.error_type is None
+
+
 @pytest.mark.parametrize("dtype", ["float32", "float64"])
 def test_numpy_estimators_use_configured_dtype(dtype: str) -> None:
     expected = np.dtype(dtype)
@@ -87,20 +98,24 @@ def test_numpy_estimators_use_configured_dtype(dtype: str) -> None:
     portfolio = _portfolio_batch()
 
     pca = PCAModel(PCAConfig(n_factors=1, dtype=dtype))
-    pca.fit(panel)
+    pca_summary = pca.fit(panel)
+    _assert_run_record(pca, pca_summary, dtype)
     assert pca._loadings is not None and pca._loadings.dtype == expected
 
     rp_pca = RPPCAModel(RPPCAConfig(n_factors=1, dtype=dtype))
-    rp_pca.fit(panel)
+    rp_pca_summary = rp_pca.fit(panel)
+    _assert_run_record(rp_pca, rp_pca_summary, dtype)
     assert rp_pca._factor_weights is not None and rp_pca._factor_weights.dtype == expected
 
     ipca = IPCAModel(IPCAConfig(n_factors=1, max_iter=2, dtype=dtype))
-    ipca.fit(cross_section)
+    ipca_summary = ipca.fit(cross_section)
+    _assert_run_record(ipca, ipca_summary, dtype)
     assert ipca.gamma.dtype == expected
     assert ipca.train_factor_returns.dtype == expected
 
     linear = LinearFeaturePortfolioModel(LinearPortfolioConfig(dtype=dtype))
-    linear.fit(portfolio)
+    linear_summary = linear.fit(portfolio)
+    _assert_run_record(linear, linear_summary, dtype)
     assert linear._coefficients is not None and linear._coefficients.dtype == expected
 
 
@@ -113,15 +128,18 @@ def test_forecasters_use_configured_dtype(dtype: str) -> None:
     )
 
     ar = AR1FactorForecaster(AR1ForecasterConfig(dtype=dtype))
-    ar.fit(state)
+    ar_summary = ar.fit(state)
+    _assert_run_record(ar, ar_summary, dtype)
     assert ar._intercepts is not None and ar._intercepts.dtype == expected
 
     ewma = EWMABaseFactorForecaster(EWMABaseForecasterConfig(dtype=dtype))
-    ewma.fit(state)
+    ewma_summary = ewma.fit(state)
+    _assert_run_record(ewma, ewma_summary, dtype)
     assert ewma._ewma_level is not None and ewma._ewma_level.dtype == expected
 
     mean = ExpandingMeanFactorForecaster(ExpandingMeanForecasterConfig(dtype=dtype))
-    mean.fit(state)
+    mean_summary = mean.fit(state)
+    _assert_run_record(mean, mean_summary, dtype)
     assert mean._mean_factor_premium is not None
     assert mean._mean_factor_premium.dtype == expected
 
@@ -143,7 +161,8 @@ def test_neural_estimators_use_configured_dtype(dtype: str, expected: torch.dtyp
             dtype=dtype,
         )
     )
-    cae.fit(cross_section)
+    cae_summary = cae.fit(cross_section)
+    _assert_run_record(cae, cae_summary, dtype)
 
     sae = SAEModel(
         SAEConfig(
@@ -157,7 +176,8 @@ def test_neural_estimators_use_configured_dtype(dtype: str, expected: torch.dtyp
             dtype=dtype,
         )
     )
-    sae.fit(cross_section)
+    sae_summary = sae.fit(cross_section)
+    _assert_run_record(sae, sae_summary, dtype)
 
     sdf_config = StochasticDiscountFactorConfig(
         state_dim_sdf=2,
@@ -176,10 +196,15 @@ def test_neural_estimators_use_configured_dtype(dtype: str, expected: torch.dtyp
         dtype=dtype,
     )
     sdf = StochasticDiscountFactorModel(sdf_config)
-    sdf.fit(cross_section)
+    sdf_summary = sdf.fit(cross_section)
+    _assert_run_record(sdf, sdf_summary, dtype)
     sdf_state = sdf.extract(cross_section)
     beta = StochasticDiscountFactorBetaNetworkHead(sdf_config)
-    beta.fit(sdf_state, cross_section)
+    beta_summary = beta.fit(sdf_state, cross_section)
+    _assert_run_record(beta, beta_summary, dtype)
+    mapper = LinearStochasticDiscountFactorReturnMapper()
+    mapper_summary = mapper.fit(sdf_state, cross_section)
+    _assert_run_record(mapper, mapper_summary, "float64")
 
     lstm = LSTMPortfolioModel(
         LSTMPortfolioConfig(
@@ -190,7 +215,8 @@ def test_neural_estimators_use_configured_dtype(dtype: str, expected: torch.dtyp
             dtype=dtype,
         )
     )
-    lstm.fit(portfolio)
+    lstm_summary = lstm.fit(portfolio)
+    _assert_run_record(lstm, lstm_summary, dtype)
     deep = DeepPortfolioModel(
         DeepPortfolioConfig(
             d_model=4,
@@ -203,7 +229,8 @@ def test_neural_estimators_use_configured_dtype(dtype: str, expected: torch.dtyp
             dtype=dtype,
         )
     )
-    deep.fit(portfolio)
+    deep_summary = deep.fit(portfolio)
+    _assert_run_record(deep, deep_summary, dtype)
 
     for checkpoints in (
         cae._checkpoint_states,

@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from importlib import import_module
 
-__version__ = "0.1.0b0"
-
+from ml4t.models._version import __version__
 from ml4t.models.api import (
     AssetMapper,
     AssetPredictionModel,
@@ -79,6 +78,7 @@ from ml4t.models.types import (
     AssetWeightsResult,
     CrossSectionBatch,
     FactorForecastResult,
+    FitRunRecord,
     FitSummary,
     LatentFactorPrediction,
     LatentFactorState,
@@ -111,6 +111,7 @@ __all__ = [
     "ExpandingMeanForecasterConfig",
     "FactorForecastResult",
     "FactorForecaster",
+    "FitRunRecord",
     "FitSummary",
     "IPCAConfig",
     "IPCAModel",

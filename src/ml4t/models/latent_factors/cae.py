@@ -11,6 +11,7 @@ import numpy as np
 
 from ml4t.models._internal.latent_factor_utils import select_checkpoint_epoch
 from ml4t.models._internal.lifecycle import atomic_fit
+from ml4t.models._internal.observability import observed_fit
 from ml4t.models._internal.persistence import (
     load_artifact,
     load_config,
@@ -46,6 +47,7 @@ class CAEModel(BaseLatentFactorModel[CAEConfig]):
     def available_checkpoints(self) -> tuple[int, ...]:
         return tuple(sorted(self._checkpoint_states))
 
+    @observed_fit
     @atomic_fit(
         "_checkpoint_states",
         "_asset_ids",
@@ -139,6 +141,7 @@ class CAEModel(BaseLatentFactorModel[CAEConfig]):
         self._checkpoint_states = defaultdict(list)
         loss_sums: dict[int, float] = dict.fromkeys(checkpoint_epochs, 0.0)
         val_best_losses: list[float] = []
+        skipped_updates = 0
 
         for ensemble_idx in range(self.config.n_ensemble):
             seed = self.config.seed + ensemble_idx
@@ -164,6 +167,7 @@ class CAEModel(BaseLatentFactorModel[CAEConfig]):
                 for start in range(0, int(flat_returns.shape[0]), self.config.batch_size):
                     batch_idx = order[start : start + self.config.batch_size]
                     if batch_idx.numel() == 1 and self.config.hidden_units:
+                        skipped_updates += 1
                         continue
 
                     scores_t = model(flat_chars[batch_idx], flat_portfolios[batch_idx])
@@ -242,6 +246,7 @@ class CAEModel(BaseLatentFactorModel[CAEConfig]):
                 "n_train_periods": float(cross_section.n_periods),
                 "n_checkpoints": float(len(self.available_checkpoints)),
                 "n_ensemble": float(self.config.n_ensemble),
+                "skipped_updates": float(skipped_updates),
             },
             val_metrics=(
                 {"best_val_loss": float(np.mean(val_best_losses))} if val_best_losses else {}

@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
+from ml4t.models._internal.observability import observed_fit
 from ml4t.models._internal.persistence import (
     load_artifact,
     load_config,
@@ -25,6 +26,7 @@ class EWMABaseFactorForecaster(BaseFactorForecaster[EWMABaseForecasterConfig]):
         super().__init__(config or EWMABaseForecasterConfig())
         self._ewma_level: np.ndarray | None = None
 
+    @observed_fit
     def fit(self, state: LatentFactorState) -> FitSummary:
         dtype = np.dtype(self.config.dtype)
         factors = require_estimable_factor_returns(state).astype(dtype, copy=False)

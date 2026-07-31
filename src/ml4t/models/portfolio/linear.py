@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
+from ml4t.models._internal.observability import observed_fit
 from ml4t.models._internal.persistence import (
     load_artifact,
     load_config,
@@ -34,6 +35,7 @@ class LinearFeaturePortfolioModel(BasePortfolioModel):
     def available_checkpoints(self) -> tuple[int, ...]:
         return (1,) if self.is_fitted else ()
 
+    @observed_fit
     def fit(
         self,
         batch: PortfolioSequenceBatch,

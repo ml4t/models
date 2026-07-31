@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from math import isfinite
 from typing import Any
 
 import numpy as np
@@ -20,6 +21,7 @@ __all__ = [
     "AssetWeightsResult",
     "CrossSectionBatch",
     "FactorForecastResult",
+    "FitRunRecord",
     "FitSummary",
     "LatentFactorPrediction",
     "LatentFactorState",
@@ -244,6 +246,41 @@ class PortfolioSequenceBatch:
 
 
 @dataclass(slots=True, frozen=True)
+class FitRunRecord:
+    """Versioned, redacted execution context for one fit attempt."""
+
+    schema_version: int
+    package_version: str
+    model_name: str
+    config: dict[str, Any]
+    seed: int
+    resolved_device: str
+    resolved_dtype: str
+    input_dimensions: dict[str, int]
+    input_sha256: str
+    stopping_reason: str
+    skipped_updates: int
+    elapsed_seconds: float
+    error_type: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.schema_version != 1:
+            raise ValueError(f"schema_version must be 1; got {self.schema_version}")
+        if not self.package_version or not self.model_name:
+            raise ValueError("package_version and model_name must be non-empty")
+        if len(self.input_sha256) != 64 or any(
+            character not in "0123456789abcdef" for character in self.input_sha256
+        ):
+            raise ValueError("input_sha256 must be a lowercase SHA-256 digest")
+        if self.skipped_updates < 0:
+            raise ValueError(f"skipped_updates must be non-negative; got {self.skipped_updates}")
+        if not isfinite(self.elapsed_seconds) or self.elapsed_seconds < 0:
+            raise ValueError(
+                f"elapsed_seconds must be finite and non-negative; got {self.elapsed_seconds!r}"
+            )
+
+
+@dataclass(slots=True, frozen=True)
 class FitSummary:
     """Fit outcome for a model or forecaster."""
 
@@ -253,6 +290,7 @@ class FitSummary:
     best_epoch: Any | None = None
     history: tuple[dict[str, float | str], ...] = ()
     notes: tuple[str, ...] = ()
+    run_record: FitRunRecord | None = None
 
 
 @dataclass(slots=True, frozen=True)

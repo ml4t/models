@@ -13,6 +13,7 @@ from ml4t.models._internal.latent_factor_utils import (
     select_checkpoint_epoch,
 )
 from ml4t.models._internal.lifecycle import atomic_fit
+from ml4t.models._internal.observability import observed_fit
 from ml4t.models._internal.persistence import (
     load_artifact,
     load_config,
@@ -45,6 +46,7 @@ class SAEModel(BaseAssetPredictionModel[SAEConfig]):
     def available_checkpoints(self) -> tuple[int, ...]:
         return tuple(sorted(self._checkpoint_states))
 
+    @observed_fit
     @atomic_fit(
         "_checkpoint_states",
         "_n_features",
