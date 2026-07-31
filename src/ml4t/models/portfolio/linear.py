@@ -2,8 +2,17 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 
+from ml4t.models._internal.persistence import (
+    load_artifact,
+    load_config,
+    require_array,
+    require_array_names,
+    save_artifact,
+)
 from ml4t.models.configs import LinearPortfolioConfig
 from ml4t.models.portfolio.base import BasePortfolioModel
 from ml4t.models.portfolio.postprocessors import normalize_cross_sectional_weights
@@ -126,3 +135,36 @@ class LinearFeaturePortfolioModel(BasePortfolioModel):
             if self.config.fit_intercept
             else self._coefficients.astype(np.float64, copy=False)
         )
+
+    def save(self, path: str | Path) -> Path:
+        if not self.is_fitted or self._coefficients is None or self._n_features is None:
+            raise RuntimeError("LinearFeaturePortfolioModel must be fitted before save()")
+        return save_artifact(
+            path,
+            model_type="ml4t.models.LinearFeaturePortfolioModel",
+            config=self.config,
+            state={"asset_ids": self._asset_ids, "n_features": self._n_features},
+            arrays={"coefficients": self._coefficients},
+        )
+
+    @classmethod
+    def load(
+        cls,
+        path: str | Path,
+        *,
+        device: str | None = None,
+    ) -> LinearFeaturePortfolioModel:
+        artifact = load_artifact(
+            path,
+            expected_model_type="ml4t.models.LinearFeaturePortfolioModel",
+        )
+        require_array_names(artifact, {"coefficients"})
+        model = cls(load_config(artifact, LinearPortfolioConfig, device=device))
+        model._coefficients = require_array(artifact, "coefficients", ndim=1)
+        model._asset_ids = tuple(artifact.state.get("asset_ids", ()))
+        model._n_features = int(artifact.state["n_features"])
+        expected_coefficients = model._n_features + int(model.config.fit_intercept)
+        if model._coefficients.shape != (expected_coefficients,):
+            raise ValueError("artifact linear portfolio coefficient shape disagrees with config")
+        model._mark_fitted()
+        return model

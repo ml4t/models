@@ -2,8 +2,17 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 
+from ml4t.models._internal.persistence import (
+    load_artifact,
+    load_config,
+    require_array,
+    require_array_names,
+    save_artifact,
+)
 from ml4t.models.configs import EWMABaseForecasterConfig
 from ml4t.models.forecasters.base import BaseFactorForecaster
 from ml4t.models.types import FactorForecastResult, FitSummary, LatentFactorState
@@ -50,3 +59,31 @@ class EWMABaseFactorForecaster(BaseFactorForecaster[EWMABaseForecasterConfig]):
             timestamps=state.timestamps,
             metadata={"model_name": self.config.model_name},
         )
+
+    def save(self, path: str | Path) -> Path:
+        if not self.is_fitted or self._ewma_level is None:
+            raise RuntimeError("EWMABaseFactorForecaster must be fitted before save()")
+        return save_artifact(
+            path,
+            model_type="ml4t.models.EWMABaseFactorForecaster",
+            config=self.config,
+            state={},
+            arrays={"ewma_level": self._ewma_level},
+        )
+
+    @classmethod
+    def load(
+        cls,
+        path: str | Path,
+        *,
+        device: str | None = None,
+    ) -> EWMABaseFactorForecaster:
+        artifact = load_artifact(
+            path,
+            expected_model_type="ml4t.models.EWMABaseFactorForecaster",
+        )
+        require_array_names(artifact, {"ewma_level"})
+        model = cls(load_config(artifact, EWMABaseForecasterConfig, device=device))
+        model._ewma_level = require_array(artifact, "ewma_level", ndim=1)
+        model._mark_fitted()
+        return model

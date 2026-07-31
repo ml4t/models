@@ -2,8 +2,17 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 
+from ml4t.models._internal.persistence import (
+    load_artifact,
+    load_config,
+    require_array,
+    require_array_names,
+    save_artifact,
+)
 from ml4t.models.api import PanelBatch
 from ml4t.models.configs import IPCAConfig
 from ml4t.models.latent_factors.base import BaseLatentFactorModel
@@ -260,6 +269,52 @@ class IPCAModel(BaseLatentFactorModel[IPCAConfig]):
                 "fit_forecast_delta": self._fit_forecast_delta,
             },
         )
+
+    def save(self, path: str | Path) -> Path:
+        if (
+            not self.is_fitted
+            or self._gamma is None
+            or self._train_factor_returns is None
+            or self._n_features is None
+        ):
+            raise RuntimeError("IPCA model must be fitted before save()")
+        return save_artifact(
+            path,
+            model_type="ml4t.models.IPCAModel",
+            config=self.config,
+            state={
+                "asset_ids": self._asset_ids,
+                "n_features": self._n_features,
+                "fit_iterations": self._fit_iterations,
+                "fit_converged": self._fit_converged,
+            },
+            arrays={
+                "gamma": self._gamma,
+                "train_factor_returns": self._train_factor_returns,
+            },
+        )
+
+    @classmethod
+    def load(cls, path: str | Path, *, device: str | None = None) -> IPCAModel:
+        artifact = load_artifact(path, expected_model_type="ml4t.models.IPCAModel")
+        require_array_names(artifact, {"gamma", "train_factor_returns"})
+        model = cls(load_config(artifact, IPCAConfig, device=device))
+        model._gamma = require_array(artifact, "gamma", ndim=2)
+        model._train_factor_returns = require_array(
+            artifact,
+            "train_factor_returns",
+            ndim=2,
+        )
+        model._asset_ids = tuple(artifact.state.get("asset_ids", ()))
+        model._n_features = int(artifact.state["n_features"])
+        model._fit_iterations = int(artifact.state["fit_iterations"])
+        model._fit_converged = bool(artifact.state["fit_converged"])
+        if model._gamma.shape != (model._n_features + 1, model.config.n_factors):
+            raise ValueError("artifact IPCA gamma shape disagrees with config")
+        if model._train_factor_returns.shape[1] != model.config.n_factors:
+            raise ValueError("artifact IPCA factor history disagrees with config")
+        model._mark_fitted()
+        return model
 
 
 def _require_cross_section(batch: PanelBatch) -> CrossSectionBatch:
