@@ -58,9 +58,14 @@ Optional extras:
 ```bash
 pip install ml4t-models[deep]         # torch-backed neural models
 pip install ml4t-models[integration]  # polars + ml4t-specs bridges
-pip install ml4t-models[docs]         # mkdocs site build
-pip install ml4t-models[all]
+pip install ml4t-models[all]          # all runtime capabilities
 ```
+
+Supported stable interpreters are Python 3.12, 3.13, and 3.14. Python 3.15 prereleases run a
+separate compatibility gate and are not yet part of the stable support range.
+
+Documentation tools are contributor dependencies. From a source checkout, run
+`uv sync --extra docs` before building the site.
 
 ## Quick Start
 

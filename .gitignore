@@ -15,7 +15,5 @@ ENV/
 .idea/
 .vscode/
 .hypothesis/
-src/ml4t/models/_version.py
-
 CLAUDE.md
 .claude/

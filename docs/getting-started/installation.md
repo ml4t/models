@@ -47,10 +47,11 @@ This extra is useful when you want:
 
 ### Documentation
 
-Build the docs locally:
+Documentation tools are contributor dependencies. From a source checkout, install them with:
 
 ```bash
-pip install ml4t-models[docs]
+uv sync --extra docs
+uv run mkdocs build --strict
 ```
 
 ### Everything
@@ -59,11 +60,19 @@ pip install ml4t-models[docs]
 pip install ml4t-models[all]
 ```
 
+The `all` extra installs only user-facing runtime capabilities from `deep` and `integration`. It
+does not install test, lint, type-check, or documentation tools.
+
 ## Python Version
 
-`ml4t-models` currently targets:
+Stable releases support:
 
-- Python `>=3.12,<3.14`
+- Python 3.12
+- Python 3.13
+- Python 3.14
+
+Python 3.15 prereleases run a separate compatibility gate. They are not part of the stable
+support range until the Python and dependency ecosystems publish compatible stable releases.
 
 ## Development Setup
 
@@ -72,13 +81,14 @@ Using `uv`:
 ```bash
 git clone https://github.com/ml4t/models.git
 cd ml4t-models
-uv sync --all-extras
+uv sync --dev --extra docs
 ```
 
 Run the quality gates:
 
 ```bash
-uv run ruff check src/ tests/
+uv run ruff check src/ tests/ examples/ scripts/
+uv run ruff format --check src/ tests/ examples/ scripts/
 uv run ty check
 uv run pytest tests/ -q
 uv build
@@ -87,7 +97,7 @@ uv build
 Build the docs:
 
 ```bash
-uv run --extra docs mkdocs build
+uv run mkdocs build --strict
 ```
 
 ## Related Libraries

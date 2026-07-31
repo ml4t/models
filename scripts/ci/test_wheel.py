@@ -44,6 +44,7 @@ def _new_venv(root: Path, name: str, python_version: str) -> Path:
 
 def _core_smoke(python: Path) -> None:
     script = """
+import importlib.resources
 import importlib.util
 
 import numpy as np
@@ -58,6 +59,7 @@ from ml4t.models import (
 )
 
 assert importlib.util.find_spec("torch") is None
+assert importlib.resources.files("ml4t.models").joinpath("py.typed").is_file()
 panel = PersistentPanelBatch(returns=np.array([[0.01, 0.02], [0.02, 0.01], [0.03, 0.01]]))
 pca = PCAModel(PCAConfig(n_factors=1))
 pca.fit(panel)
@@ -99,6 +101,7 @@ def test_wheel(candidate_dir: Path, python_version: str, mode: str) -> None:
                     f"{wheel}[all]",
                     "pytest>=9.0.3",
                     "pytest-cov>=5.0.0",
+                    "ty>=0.0.32",
                 ]
             )
         else:
@@ -110,6 +113,7 @@ def test_wheel(candidate_dir: Path, python_version: str, mode: str) -> None:
                     "--python",
                     str(test_python),
                     "pytest>=9.0.3",
+                    "ty>=0.0.32",
                 ]
             )
 
@@ -122,6 +126,8 @@ def test_wheel(candidate_dir: Path, python_version: str, mode: str) -> None:
                 str(root / "tests" / "test_release_candidate.py"),
                 "--ignore",
                 str(root / "tests" / "test_repo_hygiene.py"),
+                "--ignore",
+                str(root / "tests" / "test_coverage_gate.py"),
             ]
         else:
             selected_tests = [str(root / "tests" / name) for name in CORE_TESTS]
@@ -138,6 +144,24 @@ def test_wheel(candidate_dir: Path, python_version: str, mode: str) -> None:
             ],
             cwd=root,
         )
+        consumer = root / "typed_consumer.py"
+        consumer.write_text(
+            "from ml4t.models import PCAConfig\n"
+            "config = PCAConfig(n_factors=1)\n"
+            "invalid: str = config.n_factors\n",
+            encoding="utf-8",
+        )
+        type_result = subprocess.run(
+            [str(test_python), "-m", "ty", "check", str(consumer)],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if type_result.returncode == 0 or "invalid-assignment" not in (
+            type_result.stdout + type_result.stderr
+        ):
+            raise RuntimeError("installed-wheel consumer type check did not reject an invalid use")
 
 
 def main() -> None:

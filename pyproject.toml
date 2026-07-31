@@ -15,9 +15,12 @@ include = [
     "/tests",
     "/scripts",
     "/examples",
+    "/docs",
     "/README.md",
     "/LICENSE",
+    "/SECURITY.md",
     "/CHANGELOG.md",
+    "/mkdocs.yml",
     "/pyproject.toml",
 ]
 
@@ -65,7 +68,7 @@ dependencies = [
 
 [project.optional-dependencies]
 deep = [
-    "torch>=2.11.0",
+    "torch>=2.13.0",
 ]
 integration = [
     "polars>=1.0.0",
@@ -77,9 +80,9 @@ dev = [
     "pytest>=9.0.3",
     "pytest-cov>=5.0.0",
     "ruff>=0.8.0",
-    "ty",
+    "ty>=0.0.32",
     "pre-commit>=3.3.0",
-    "torch>=2.11.0",
+    "torch>=2.13.0",
 ]
 docs = [
     "mkdocs>=1.6,<2",
@@ -104,9 +107,9 @@ dev = [
     "pytest>=9.0.3",
     "pytest-cov>=5.0.0",
     "ruff>=0.8.0",
-    "ty",
+    "ty>=0.0.32",
     "pre-commit>=3.3.0",
-    "torch>=2.11.0",
+    "torch>=2.13.0",
     "twine>=6.0.0",
 ]
 

@@ -226,6 +226,51 @@ jobs:
           --python-version "${{ steps.setup-python.outputs.python-path }}"
           --mode full
 
+  dependency-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    needs: build-candidate
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        id: setup-python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Download candidate
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-candidate
+          path: candidate
+
+      - name: Audit current contributor environment
+        run: |
+          uv sync --dev --extra docs --python "${{ steps.setup-python.outputs.python-path }}"
+          uv run --with pip-audit --with 'setuptools>=83.0.0' python -m pip_audit \
+            --progress-spinner off
+
+      - name: Audit supported minimum dependencies
+        run: |
+          wheel="$(find candidate/dist -name '*.whl' -print -quit)"
+          uv venv .audit-minimum --python "${{ steps.setup-python.outputs.python-path }}"
+          uv pip install --python .audit-minimum/bin/python \
+            "${wheel}[all]" \
+            'numpy==1.26.0' \
+            'torch==2.13.0' \
+            'polars==1.0.0' \
+            'ml4t-specs==0.1.0b0' \
+            'pytest==9.0.3' \
+            'setuptools>=83.0.0' \
+            pip-audit
+          .audit-minimum/bin/python -m pip_audit --progress-spinner off
+
   python-prerelease:
     name: ${{ matrix.os }} / Python 3.15 prerelease
     runs-on: ${{ matrix.os }}
@@ -323,7 +368,7 @@ jobs:
   qualify:
     name: Qualify Candidate
     runs-on: ubuntu-latest
-    needs: [stable-platform, python-prerelease]
+    needs: [stable-platform, python-prerelease, dependency-audit]
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
