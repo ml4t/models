@@ -11,6 +11,7 @@ import torch
 from torch import nn
 
 from ml4t.models._internal.latent_factor_utils import select_checkpoint_epoch
+from ml4t.models._internal.lifecycle import atomic_fit
 from ml4t.models._internal.persistence import (
     load_artifact,
     load_config,
@@ -141,6 +142,15 @@ class LSTMPortfolioModel(BasePortfolioModel):
     def available_checkpoints(self) -> tuple[int, ...]:
         return tuple(sorted(self._checkpoint_states))
 
+    @atomic_fit(
+        "_asset_ids",
+        "_n_assets",
+        "_n_features",
+        "_n_groups",
+        "_checkpoint_states",
+        "_history",
+        "_is_fitted",
+    )
     def fit(
         self,
         batch: PortfolioSequenceBatch,
@@ -159,7 +169,6 @@ class LSTMPortfolioModel(BasePortfolioModel):
 
         device = resolve_device(torch, self.config.device)
         seed_torch(torch, self.config.seed, device)
-        np.random.seed(self.config.seed)
 
         model = LSTMPortfolioPolicy(
             n_assets=batch.n_assets,

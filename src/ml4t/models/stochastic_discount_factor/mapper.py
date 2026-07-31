@@ -12,6 +12,7 @@ from ml4t.models._internal.latent_factor_utils import (
     resolve_checkpoint_epochs,
     select_checkpoint_epoch,
 )
+from ml4t.models._internal.lifecycle import atomic_fit
 from ml4t.models._internal.persistence import (
     load_artifact,
     load_config,
@@ -137,6 +138,14 @@ class StochasticDiscountFactorBetaNetworkHead:
     def is_fitted(self) -> bool:
         return bool(self._checkpoint_states)
 
+    @atomic_fit(
+        "_checkpoint_states",
+        "_n_asset_features",
+        "_n_context_features",
+        "_asset_ids",
+        "_f_hat_scale",
+        "_history",
+    )
     def fit(
         self,
         state: StochasticDiscountFactorState,
@@ -154,7 +163,6 @@ class StochasticDiscountFactorBetaNetworkHead:
         nn = _import_stochastic_discount_factor_nn()
         device = resolve_device(torch, self.config.device)
         seed_torch(torch, self.config.seed, device)
-        np.random.seed(self.config.seed)
 
         train_payload = _beta_training_payload(state, batch, scale=None)
         if train_payload is None:
