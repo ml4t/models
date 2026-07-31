@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 import torch
+from torch import nn
 
-from ml4t.models import RPPCAConfig
+from ml4t.models import PortfolioConfig, PortfolioSequenceBatch, RPPCAConfig
 from ml4t.models._internal.latent_factor_utils import compute_managed_portfolios
 from ml4t.models._internal.stochastic_discount_factor_nn import (
     conditional_loss,
@@ -12,7 +14,9 @@ from ml4t.models._internal.stochastic_discount_factor_nn import (
 )
 from ml4t.models.latent_factors.ipca import _normalize_theta_y
 from ml4t.models.latent_factors.rp_pca import _risk_premium_matrix
+from ml4t.models.portfolio import runtime as portfolio_runtime
 from ml4t.models.portfolio.losses import compute_net_portfolio_returns, softmin_sharpe
+from ml4t.models.portfolio.postprocessors import normalize_cross_sectional_weights
 
 
 def test_rp_pca_default_matches_lettau_pelger_signal_matrix() -> None:
@@ -168,3 +172,182 @@ def test_softmin_sharpe_is_stable_for_extreme_finite_values() -> None:
         )
         torch.testing.assert_close(actual, expected)
         assert torch.isfinite(actual)
+
+
+class _ScalarPolicy(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.scale = nn.Parameter(torch.tensor(0.5))
+
+    def forward(
+        self,
+        features: torch.Tensor,
+        *,
+        mask: torch.Tensor,
+        asset_indices: torch.Tensor,
+        group_ids: torch.Tensor | None,
+        costs: torch.Tensor | None,
+    ) -> torch.Tensor:
+        del asset_indices, group_ids, costs
+        return self.scale * features[..., 0] * mask
+
+
+def _portfolio_training_batch() -> PortfolioSequenceBatch:
+    return PortfolioSequenceBatch(
+        features=np.array(
+            [
+                [[[1.0]], [[2.0]], [[-1.0]]],
+                [[[-1.0]], [[1.0]], [[2.0]]],
+                [[[0.5]], [[-2.0]], [[1.0]]],
+                [[[2.0]], [[0.5]], [[-0.5]]],
+            ]
+        ),
+        returns=np.array(
+            [
+                [[0.01], [0.02], [-0.01]],
+                [[-0.02], [0.01], [0.03]],
+                [[0.03], [-0.01], [0.02]],
+                [[-0.01], [0.03], [0.01]],
+            ]
+        ),
+        vol_scale=np.ones((4, 3, 1)),
+    )
+
+
+def test_portfolio_training_is_invariant_to_forward_chunk_size() -> None:
+    batch = _portfolio_training_batch()
+    artifacts = []
+    for batch_size in (1, batch.batch_size):
+        artifacts.append(
+            portfolio_runtime.fit_policy_network(
+                _ScalarPolicy(),
+                batch=batch,
+                validation_batch=batch,
+                config=PortfolioConfig(
+                    batch_size=batch_size,
+                    learning_rate=0.01,
+                    max_iters=3,
+                    eval_every=1,
+                    checkpoint_every=1,
+                    early_stopping_burn_in_iters=10,
+                    use_group_embedding=False,
+                    use_cost_in_context=False,
+                ),
+                device=torch.device("cpu"),
+            )
+        )
+
+    torch.testing.assert_close(
+        artifacts[0].checkpoint_states[3]["scale"],
+        artifacts[1].checkpoint_states[3]["scale"],
+    )
+    assert [entry["train_objective"] for entry in artifacts[0].history] == pytest.approx(
+        [entry["train_objective"] for entry in artifacts[1].history]
+    )
+
+
+def test_portfolio_cost_starts_from_supplied_initial_holdings() -> None:
+    weights = torch.tensor([[[0.2, -0.1], [0.3, -0.2]]], dtype=torch.float64)
+    returns = torch.zeros_like(weights)
+    mask = torch.ones_like(weights)
+    previous = torch.tensor([[0.1, -0.1]], dtype=torch.float64)
+
+    actual = compute_net_portfolio_returns(
+        weights=weights,
+        forward_returns=returns,
+        vol_scale=torch.ones_like(weights),
+        mask=mask,
+        costs=torch.ones(2, dtype=torch.float64),
+        prev_weights=previous,
+        gamma_cost=1.0,
+        turnover_penalty=0.5,
+    )
+    expected = torch.tensor([[-0.075, -0.15]], dtype=torch.float64)
+
+    torch.testing.assert_close(actual, expected)
+
+
+def test_portfolio_training_rejects_nonfinite_objective() -> None:
+    class NonFinitePolicy(_ScalarPolicy):
+        def forward(self, *args: object, **kwargs: object) -> torch.Tensor:
+            return super().forward(*args, **kwargs) * float("nan")
+
+    batch = _portfolio_training_batch()
+
+    with pytest.raises(FloatingPointError, match="non-finite training loss at step 1"):
+        portfolio_runtime.fit_policy_network(
+            NonFinitePolicy(),
+            batch=batch,
+            validation_batch=batch,
+            config=PortfolioConfig(max_iters=1, eval_every=1, checkpoint_every=1),
+            device=torch.device("cpu"),
+        )
+
+
+def test_portfolio_best_checkpoint_contains_exact_evaluated_state(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    batch = _portfolio_training_batch()
+    evaluated_states: list[float] = []
+
+    def fake_validation(
+        policy: nn.Module,
+        batch: PortfolioSequenceBatch,
+        *,
+        group_ids: torch.Tensor | None,
+        costs: torch.Tensor | None,
+        config: PortfolioConfig,
+        device: torch.device,
+    ) -> float:
+        del batch, group_ids, costs, config, device
+        evaluated_states.append(float(next(policy.parameters()).detach().item()))
+        return float(4 - len(evaluated_states))
+
+    monkeypatch.setattr(portfolio_runtime, "evaluate_pooled_sharpe", fake_validation)
+    artifacts = portfolio_runtime.fit_policy_network(
+        _ScalarPolicy(),
+        batch=batch,
+        validation_batch=batch,
+        config=PortfolioConfig(
+            batch_size=4,
+            learning_rate=0.01,
+            max_iters=3,
+            eval_every=1,
+            checkpoint_every=3,
+            early_stopping_burn_in_iters=10,
+        ),
+        device=torch.device("cpu"),
+    )
+
+    assert artifacts.best_step == 1
+    assert float(artifacts.checkpoint_states[1]["scale"].item()) == pytest.approx(
+        evaluated_states[0]
+    )
+
+
+def test_portfolio_constraints_are_satisfied_jointly() -> None:
+    raw = np.array([[[10.0, 1.0, -1.0, -2.0]]])
+    mask = np.ones_like(raw, dtype=bool)
+
+    constrained = normalize_cross_sectional_weights(
+        raw,
+        mask=mask,
+        gross_exposure=1.0,
+        net_exposure=0.2,
+        max_abs_weight=0.3,
+    )
+
+    assert np.abs(constrained).sum() == pytest.approx(1.0, abs=1e-10)
+    assert constrained.sum() == pytest.approx(0.2, abs=1e-10)
+    assert np.abs(constrained).max() <= 0.3 + 1e-10
+
+
+def test_portfolio_constraints_reject_infeasible_request() -> None:
+    with pytest.raises(ValueError, match="infeasible portfolio constraints"):
+        normalize_cross_sectional_weights(
+            np.ones((1, 1, 2)),
+            mask=np.ones((1, 1, 2), dtype=bool),
+            gross_exposure=1.0,
+            net_exposure=0.0,
+            max_abs_weight=0.2,
+        )

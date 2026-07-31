@@ -26,6 +26,8 @@ def compute_net_portfolio_returns(
     mask: torch.Tensor,
     costs: torch.Tensor | None,
     gamma_cost: float,
+    prev_weights: torch.Tensor | None = None,
+    turnover_penalty: float = 0.0,
 ) -> torch.Tensor:
     """Compute net portfolio returns for a sequence of cross-sectional decisions."""
 
@@ -37,9 +39,14 @@ def compute_net_portfolio_returns(
         vol_scale * weights,
         torch.zeros_like(weights),
     )
+    initial_weights = (
+        torch.zeros((batch_size, n_assets), device=weights.device, dtype=weights.dtype)
+        if prev_weights is None
+        else prev_weights.to(device=weights.device, dtype=weights.dtype)
+    )
     previous = torch.cat(
         [
-            torch.zeros((batch_size, 1, n_assets), device=weights.device, dtype=weights.dtype),
+            initial_weights.unsqueeze(1),
             scaled_weights[:, :-1, :],
         ],
         dim=1,
@@ -54,11 +61,13 @@ def compute_net_portfolio_returns(
     n_available = mask.sum(dim=-1).clamp(min=1.0)
     gross = gross / n_available
 
-    if costs is None:
+    if costs is None and turnover_penalty == 0.0:
         return gross
 
-    if costs.ndim == 2 and costs.shape[1] == 1 or costs.ndim == 1 and costs.shape[0] == n_assets:
-        cost_tensor = costs.view(1, 1, n_assets)
+    if costs is None:
+        cost_tensor = torch.zeros((1, 1, n_assets), device=weights.device, dtype=weights.dtype)
+    elif costs.ndim == 2 and costs.shape[1] == 1 or costs.ndim == 1 and costs.shape[0] == n_assets:
+        cost_tensor = costs.to(device=weights.device, dtype=weights.dtype).view(1, 1, n_assets)
     else:
         raise ValueError("costs must have shape (N,) or (N, 1)")
 
@@ -67,8 +76,8 @@ def compute_net_portfolio_returns(
         torch.abs(scaled_weights - previous),
         torch.zeros_like(weights),
     )
-    cost = (cost_tensor * turnover).sum(dim=-1)
-    cost = (gamma_cost * cost) / n_available
+    cost = ((gamma_cost * cost_tensor + turnover_penalty) * turnover).sum(dim=-1)
+    cost = cost / n_available
     return gross - cost
 
 
@@ -114,6 +123,8 @@ def robust_sharpe_loss(
     eps: float,
     tau: float,
     lambda_soft: float,
+    prev_weights: torch.Tensor | None = None,
+    turnover_penalty: float = 0.0,
 ) -> PortfolioLossOutput:
     """Compute a pooled-plus-softmin Sharpe objective."""
 
@@ -124,6 +135,8 @@ def robust_sharpe_loss(
         mask=mask,
         costs=costs,
         gamma_cost=gamma_cost,
+        prev_weights=prev_weights,
+        turnover_penalty=turnover_penalty,
     )
     effective_returns = net_returns[:, burn_in:] if burn_in > 0 else net_returns
 
