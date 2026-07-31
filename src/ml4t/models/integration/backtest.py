@@ -458,6 +458,13 @@ def _fallback_feed_spec_mapping(schema: Any | None) -> dict[str, Any]:
                 "mid_col",
                 "bid_size_col",
                 "ask_size_col",
+                "calendar",
+                "timezone",
+                "data_frequency",
+                "frequency",
+                "bar_type",
+                "timestamp_semantics",
+                "session_start_time",
             ),
         )
     else:
