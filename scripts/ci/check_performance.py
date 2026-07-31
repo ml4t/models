@@ -10,7 +10,7 @@ from typing import Any
 import numpy as np
 
 MAX_TIMING_RANGE = 2.0
-MIN_TIMING_FOR_RANGE_SECONDS = 0.01
+MIN_TIMING_FOR_RANGE_SECONDS = 0.1
 CUDA_RTOL = 1e-5
 CUDA_ATOL = 1e-5
 
