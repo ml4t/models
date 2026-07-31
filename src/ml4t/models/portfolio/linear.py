@@ -6,7 +6,11 @@ from pathlib import Path
 
 import numpy as np
 
-from ml4t.models._internal.observability import observed_fit
+from ml4t.models._internal.observability import (
+    observed_fit,
+    restore_fit_record,
+    state_with_fit_record,
+)
 from ml4t.models._internal.persistence import (
     load_artifact,
     load_config,
@@ -146,7 +150,10 @@ class LinearFeaturePortfolioModel(BasePortfolioModel):
             path,
             model_type="ml4t.models.LinearFeaturePortfolioModel",
             config=self.config,
-            state={"asset_ids": self._asset_ids, "n_features": self._n_features},
+            state=state_with_fit_record(
+                self,
+                {"asset_ids": self._asset_ids, "n_features": self._n_features},
+            ),
             arrays={"coefficients": self._coefficients},
         )
 
@@ -169,5 +176,6 @@ class LinearFeaturePortfolioModel(BasePortfolioModel):
         expected_coefficients = model._n_features + int(model.config.fit_intercept)
         if model._coefficients.shape != (expected_coefficients,):
             raise ValueError("artifact linear portfolio coefficient shape disagrees with config")
+        restore_fit_record(model, artifact.state)
         model._mark_fitted()
         return model

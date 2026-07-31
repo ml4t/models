@@ -12,7 +12,11 @@ from torch import nn
 
 from ml4t.models._internal.latent_factor_utils import select_checkpoint_epoch
 from ml4t.models._internal.lifecycle import atomic_fit
-from ml4t.models._internal.observability import observed_fit
+from ml4t.models._internal.observability import (
+    observed_fit,
+    restore_fit_record,
+    state_with_fit_record,
+)
 from ml4t.models._internal.persistence import (
     load_artifact,
     load_config,
@@ -275,14 +279,17 @@ class LSTMPortfolioModel(BasePortfolioModel):
             path,
             model_type="ml4t.models.LSTMPortfolioModel",
             config=self.config,
-            state={
-                "asset_ids": self._asset_ids,
-                "n_assets": self._n_assets,
-                "n_features": self._n_features,
-                "n_groups": self._n_groups,
-                "history": self._history,
-                "checkpoint_tree": checkpoint_tree,
-            },
+            state=state_with_fit_record(
+                self,
+                {
+                    "asset_ids": self._asset_ids,
+                    "n_assets": self._n_assets,
+                    "n_features": self._n_features,
+                    "n_groups": self._n_groups,
+                    "history": self._history,
+                    "checkpoint_tree": checkpoint_tree,
+                },
+            ),
             arrays=arrays,
         )
 
@@ -312,5 +319,6 @@ class LSTMPortfolioModel(BasePortfolioModel):
             raise ValueError("artifact LSTM portfolio has no checkpoints")
         if model._asset_ids and len(model._asset_ids) != model._n_assets:
             raise ValueError("artifact LSTM portfolio asset identity disagrees with dimensions")
+        restore_fit_record(model, artifact.state)
         model._mark_fitted()
         return model

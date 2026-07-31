@@ -13,7 +13,12 @@ from ml4t.models._internal.latent_factor_utils import (
     select_checkpoint_epoch,
 )
 from ml4t.models._internal.lifecycle import atomic_fit
-from ml4t.models._internal.observability import FitObservable, observed_fit
+from ml4t.models._internal.observability import (
+    FitObservable,
+    observed_fit,
+    restore_fit_record,
+    state_with_fit_record,
+)
 from ml4t.models._internal.persistence import (
     load_artifact,
     load_config,
@@ -110,7 +115,10 @@ class LinearStochasticDiscountFactorReturnMapper(FitObservable):
             path,
             model_type="ml4t.models.LinearStochasticDiscountFactorReturnMapper",
             config=self.config,
-            state={"intercept": self._intercept, "slope": self._slope},
+            state=state_with_fit_record(
+                self,
+                {"intercept": self._intercept, "slope": self._slope},
+            ),
             arrays={},
         )
 
@@ -124,6 +132,7 @@ class LinearStochasticDiscountFactorReturnMapper(FitObservable):
         model = cls()
         model._intercept = float(artifact.state["intercept"])
         model._slope = float(artifact.state["slope"])
+        restore_fit_record(model, artifact.state)
         model._is_fitted = True
         return model
 
@@ -353,14 +362,17 @@ class StochasticDiscountFactorBetaNetworkHead(FitObservable):
             path,
             model_type="ml4t.models.StochasticDiscountFactorBetaNetworkHead",
             config=self.config,
-            state={
-                "asset_ids": self._asset_ids,
-                "n_asset_features": self._n_asset_features,
-                "n_context_features": self._n_context_features,
-                "f_hat_scale": self._f_hat_scale,
-                "history": self._history,
-                "checkpoint_tree": checkpoint_tree,
-            },
+            state=state_with_fit_record(
+                self,
+                {
+                    "asset_ids": self._asset_ids,
+                    "n_asset_features": self._n_asset_features,
+                    "n_context_features": self._n_context_features,
+                    "f_hat_scale": self._f_hat_scale,
+                    "history": self._history,
+                    "checkpoint_tree": checkpoint_tree,
+                },
+            ),
             arrays=arrays,
         )
 
@@ -391,6 +403,7 @@ class StochasticDiscountFactorBetaNetworkHead(FitObservable):
         model._history = tuple(artifact.state.get("history", ()))
         if not model._checkpoint_states:
             raise ValueError("artifact SDF beta-network has no checkpoints")
+        restore_fit_record(model, artifact.state)
         return model
 
 

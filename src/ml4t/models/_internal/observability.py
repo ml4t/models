@@ -25,6 +25,26 @@ class FitObservable:
         return self._last_fit_record
 
 
+def state_with_fit_record(model: FitObservable, state: dict[str, Any]) -> dict[str, Any]:
+    """Add the required fit record to a persisted model state."""
+
+    if model.last_fit_record is None:
+        raise RuntimeError("fitted model has no fit run record")
+    return {**state, "fit_run_record": asdict(model.last_fit_record)}
+
+
+def restore_fit_record(model: FitObservable, state: dict[str, Any]) -> None:
+    """Restore and validate a fit record from persisted model state."""
+
+    raw_record = state.get("fit_run_record")
+    if not isinstance(raw_record, dict):
+        raise ValueError("artifact is missing a valid fit run record")
+    try:
+        model._last_fit_record = FitRunRecord(**raw_record)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("artifact contains an invalid fit run record") from exc
+
+
 def observed_fit(method: Callable[..., FitSummary]) -> Callable[..., FitSummary]:
     """Attach a complete run record to a fit summary and retain failures."""
 

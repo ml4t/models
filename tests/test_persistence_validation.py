@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 import torch
 
-from ml4t.models import PCAConfig
+from ml4t.models import PCAConfig, PCAModel, PersistentPanelBatch
 from ml4t.models._internal import persistence
 
 
@@ -296,3 +296,36 @@ def test_failed_atomic_save_preserves_prior_artifact(
 
     assert path.read_bytes() == original
     assert not tuple(tmp_path.glob("*.tmp"))
+
+
+@pytest.mark.parametrize(
+    ("replacement", "message"),
+    [
+        (None, "missing a valid fit run record"),
+        ({"schema_version": 2}, "invalid fit run record"),
+    ],
+)
+def test_model_load_rejects_missing_or_invalid_fit_run_record(
+    tmp_path: Path,
+    replacement: dict[str, object] | None,
+    message: str,
+) -> None:
+    model = PCAModel(PCAConfig(n_factors=1))
+    model.fit(
+        PersistentPanelBatch(
+            returns=np.array([[1.0, 2.0], [2.0, 3.0]]),
+            asset_ids=("A", "B"),
+        )
+    )
+    path = model.save(tmp_path / "pca.ml4t")
+    manifest, arrays = _payloads(path)
+    state = manifest["state"]
+    assert isinstance(state, dict)
+    if replacement is None:
+        state.pop("fit_run_record")
+    else:
+        state["fit_run_record"] = replacement
+    _rewrite(path, manifest, arrays)
+
+    with pytest.raises(ValueError, match=message):
+        PCAModel.load(path)

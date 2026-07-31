@@ -13,7 +13,11 @@ from ml4t.models._internal.latent_factor_utils import (
     resolve_checkpoint_epochs,
 )
 from ml4t.models._internal.lifecycle import atomic_fit
-from ml4t.models._internal.observability import observed_fit
+from ml4t.models._internal.observability import (
+    observed_fit,
+    restore_fit_record,
+    state_with_fit_record,
+)
 from ml4t.models._internal.persistence import (
     load_artifact,
     load_config,
@@ -444,13 +448,16 @@ class StochasticDiscountFactorModel(BaseStochasticDiscountFactorModel):
             path,
             model_type="ml4t.models.StochasticDiscountFactorModel",
             config=self.config,
-            state={
-                "asset_ids": self._asset_ids,
-                "n_characteristics": self._n_characteristics,
-                "n_context_features": self._n_context_features,
-                "history": self._history,
-                "checkpoint_tree": checkpoint_tree,
-            },
+            state=state_with_fit_record(
+                self,
+                {
+                    "asset_ids": self._asset_ids,
+                    "n_characteristics": self._n_characteristics,
+                    "n_context_features": self._n_context_features,
+                    "history": self._history,
+                    "checkpoint_tree": checkpoint_tree,
+                },
+            ),
             arrays=arrays,
         )
 
@@ -480,6 +487,7 @@ class StochasticDiscountFactorModel(BaseStochasticDiscountFactorModel):
         model._history = tuple(artifact.state.get("history", ()))
         if not model._checkpoint_states:
             raise ValueError("artifact stochastic discount factor has no checkpoints")
+        restore_fit_record(model, artifact.state)
         model._mark_fitted()
         return model
 

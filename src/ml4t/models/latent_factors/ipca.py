@@ -6,7 +6,11 @@ from pathlib import Path
 
 import numpy as np
 
-from ml4t.models._internal.observability import observed_fit
+from ml4t.models._internal.observability import (
+    observed_fit,
+    restore_fit_record,
+    state_with_fit_record,
+)
 from ml4t.models._internal.persistence import (
     load_artifact,
     load_config,
@@ -286,12 +290,15 @@ class IPCAModel(BaseLatentFactorModel[IPCAConfig]):
             path,
             model_type="ml4t.models.IPCAModel",
             config=self.config,
-            state={
-                "asset_ids": self._asset_ids,
-                "n_features": self._n_features,
-                "fit_iterations": self._fit_iterations,
-                "fit_converged": self._fit_converged,
-            },
+            state=state_with_fit_record(
+                self,
+                {
+                    "asset_ids": self._asset_ids,
+                    "n_features": self._n_features,
+                    "fit_iterations": self._fit_iterations,
+                    "fit_converged": self._fit_converged,
+                },
+            ),
             arrays={
                 "gamma": self._gamma,
                 "train_factor_returns": self._train_factor_returns,
@@ -317,6 +324,7 @@ class IPCAModel(BaseLatentFactorModel[IPCAConfig]):
             raise ValueError("artifact IPCA gamma shape disagrees with config")
         if model._train_factor_returns.shape[1] != model.config.n_factors:
             raise ValueError("artifact IPCA factor history disagrees with config")
+        restore_fit_record(model, artifact.state)
         model._mark_fitted()
         return model
 
