@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 
@@ -56,6 +57,14 @@ def seed_torch(torch: Any, seed: int, device: Any) -> None:
     torch.manual_seed(seed)
     device_type = getattr(device, "type", "cpu")
     if device_type == "cuda":
+        os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+        use_deterministic_algorithms = getattr(torch, "use_deterministic_algorithms", None)
+        if callable(use_deterministic_algorithms):
+            use_deterministic_algorithms(True)
+        cudnn = getattr(getattr(torch, "backends", None), "cudnn", None)
+        if cudnn is not None:
+            cudnn.benchmark = False
+            cudnn.deterministic = True
         torch.cuda.manual_seed_all(seed)
     elif device_type == "mps":
         mps_manual_seed = getattr(getattr(torch, "mps", None), "manual_seed", None)

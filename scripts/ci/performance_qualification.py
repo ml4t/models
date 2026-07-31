@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import platform
 import resource
 import sys
@@ -502,6 +503,11 @@ def qualify(profile_name: str, device: str) -> tuple[dict[str, Any], dict[str, n
                 ),
                 "cuda_device": torch.cuda.get_device_name() if device == "cuda" else None,
                 "cuda_runtime": torch.version.cuda,
+                "cublas_workspace_config": os.environ.get("CUBLAS_WORKSPACE_CONFIG"),
+                "deterministic_algorithms": torch.are_deterministic_algorithms_enabled(),
+                "mkl_num_threads": os.environ.get("MKL_NUM_THREADS"),
+                "omp_num_threads": os.environ.get("OMP_NUM_THREADS"),
+                "openblas_num_threads": os.environ.get("OPENBLAS_NUM_THREADS"),
                 "package_version": __version__,
                 "platform": platform.platform(),
                 "python": sys.version,
