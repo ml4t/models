@@ -8,7 +8,6 @@ import numpy as np
 import torch
 from torch import nn
 from torch.optim import AdamW
-from torch.utils.data import DataLoader, TensorDataset
 
 from ml4t.models._internal.latent_factor_utils import (
     resolve_checkpoint_epochs,
@@ -79,7 +78,6 @@ def fit_policy_network(
         lr=config.learning_rate,
         weight_decay=config.weight_decay,
     )
-    train_loader = build_loader(batch, config.batch_size, shuffle=True)
     checkpoint_steps = tuple(
         resolve_checkpoint_epochs(
             config.max_iters,
@@ -95,28 +93,24 @@ def fit_policy_network(
     best_val_sharpe = float("-inf")
     ema_value: float | None = None
     bad_count = 0
-    train_iter = iter(train_loader)
+    best_state: dict[str, torch.Tensor] | None = None
+    features = torch.as_tensor(batch.features, dtype=torch.float32, device=device)
+    forward_returns = torch.as_tensor(batch.returns, dtype=torch.float32, device=device)
+    vol_scale = torch.as_tensor(_vol_scale(batch), dtype=torch.float32, device=device)
+    mask = mask_tensor(batch, device)
+    prev_weights = previous_weights_tensor(batch, device)
 
     for step in range(1, config.max_iters + 1):
         policy.train()
-        try:
-            features, forward_returns, vol_scale, mask = next(train_iter)
-        except StopIteration:
-            train_iter = iter(train_loader)
-            features, forward_returns, vol_scale, mask = next(train_iter)
-
-        features = features.to(device=device, dtype=torch.float32)
-        forward_returns = forward_returns.to(device=device, dtype=torch.float32)
-        vol_scale = vol_scale.to(device=device, dtype=torch.float32)
-        mask = mask.to(device=device, dtype=torch.float32)
-
         optimizer.zero_grad(set_to_none=True)
-        weights = policy(
+        weights = _policy_weights(
+            policy,
             features,
             mask=mask,
             asset_indices=asset_indices,
             group_ids=group_ids_train,
             costs=costs_train,
+            chunk_size=config.batch_size,
         )
         loss_output = robust_sharpe_loss(
             weights=weights,
@@ -130,14 +124,28 @@ def fit_policy_network(
             eps=config.sharpe_eps,
             tau=config.softmin_tau,
             lambda_soft=config.softmin_lambda,
+            prev_weights=prev_weights,
+            turnover_penalty=config.turnover_penalty,
         )
-        if torch.isnan(loss_output.loss) or torch.isinf(loss_output.loss):
-            optimizer.zero_grad(set_to_none=True)
-            continue
+        if not bool(torch.isfinite(loss_output.loss).item()):
+            raise FloatingPointError(f"non-finite training loss at step {step}")
         loss_output.loss.backward()
+        if any(
+            parameter.grad is not None and not bool(torch.isfinite(parameter.grad).all().item())
+            for parameter in policy.parameters()
+        ):
+            raise FloatingPointError(f"non-finite training gradient at step {step}")
         if config.max_grad_norm > 0:
-            torch.nn.utils.clip_grad_norm_(policy.parameters(), max_norm=config.max_grad_norm)
+            grad_norm = torch.nn.utils.clip_grad_norm_(
+                policy.parameters(), max_norm=config.max_grad_norm
+            )
+            if not bool(torch.isfinite(grad_norm).item()):
+                raise FloatingPointError(f"non-finite training gradient norm at step {step}")
         optimizer.step()
+        if any(
+            not bool(torch.isfinite(parameter).all().item()) for parameter in policy.parameters()
+        ):
+            raise FloatingPointError(f"non-finite model parameter at step {step}")
 
         if step % config.eval_every != 0 and step not in checkpoint_steps:
             continue
@@ -150,6 +158,8 @@ def fit_policy_network(
             config=config,
             device=device,
         )
+        if not np.isfinite(val_sharpe):
+            raise FloatingPointError(f"non-finite validation Sharpe at step {step}")
         ema_value = (
             val_sharpe
             if ema_value is None
@@ -176,14 +186,16 @@ def fit_policy_network(
         if val_sharpe > best_val_sharpe:
             best_val_sharpe = val_sharpe
             best_step = step
+            best_state = cpu_state_dict(policy)
         if (
             step >= config.early_stopping_burn_in_iters
             and bad_count >= config.early_stopping_patience
         ):
             break
 
-    if best_step not in checkpoint_states:
-        checkpoint_states[best_step] = cpu_state_dict(policy)
+    if best_state is None:
+        raise RuntimeError("portfolio training completed without an evaluated checkpoint")
+    checkpoint_states[best_step] = best_state
 
     return PortfolioTrainingArtifacts(
         checkpoint_states=checkpoint_states,
@@ -191,26 +203,6 @@ def fit_policy_network(
         best_step=best_step,
         best_validation_sharpe=best_val_sharpe,
     )
-
-
-def build_loader(
-    batch: PortfolioSequenceBatch,
-    batch_size: int,
-    *,
-    shuffle: bool,
-) -> DataLoader:
-    dataset = TensorDataset(
-        torch.as_tensor(batch.features, dtype=torch.float32),
-        torch.as_tensor(batch.returns, dtype=torch.float32),
-        torch.as_tensor(_vol_scale(batch), dtype=torch.float32),
-        torch.as_tensor(
-            np.asarray(batch.mask, dtype=np.float32)
-            if batch.mask is not None
-            else np.ones(batch.features.shape[:3], dtype=np.float32),
-            dtype=torch.float32,
-        ),
-    )
-    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
 
 @torch.no_grad()
@@ -249,6 +241,8 @@ def evaluate_pooled_sharpe(
         eps=config.sharpe_eps,
         tau=config.softmin_tau,
         lambda_soft=config.softmin_lambda,
+        prev_weights=previous_weights_tensor(batch, device),
+        turnover_penalty=config.turnover_penalty,
     )
     return float(loss_output.sharpe_pool.item())
 
@@ -279,6 +273,14 @@ def costs_tensor(batch: PortfolioSequenceBatch, device: torch.device) -> torch.T
     return torch.as_tensor(costs, dtype=torch.float32, device=device)
 
 
+def previous_weights_tensor(
+    batch: PortfolioSequenceBatch, device: torch.device
+) -> torch.Tensor | None:
+    if batch.prev_weights is None:
+        return None
+    return torch.as_tensor(batch.prev_weights, dtype=torch.float32, device=device)
+
+
 def _vol_scale(batch: PortfolioSequenceBatch) -> np.ndarray:
     if batch.vol_scale is None:
         return np.ones(batch.features.shape[:3], dtype=np.float64)
@@ -298,3 +300,28 @@ def adjacency_mask_tensor(
 
 def cpu_state_dict(model: nn.Module) -> dict[str, torch.Tensor]:
     return {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
+
+
+def _policy_weights(
+    policy: nn.Module,
+    features: torch.Tensor,
+    *,
+    mask: torch.Tensor,
+    asset_indices: torch.Tensor,
+    group_ids: torch.Tensor | None,
+    costs: torch.Tensor | None,
+    chunk_size: int,
+) -> torch.Tensor:
+    chunks = []
+    for start in range(0, features.shape[0], chunk_size):
+        end = start + chunk_size
+        chunks.append(
+            policy(
+                features[start:end],
+                mask=mask[start:end],
+                asset_indices=asset_indices,
+                group_ids=group_ids,
+                costs=costs,
+            )
+        )
+    return torch.cat(chunks, dim=0)

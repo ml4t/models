@@ -59,7 +59,18 @@ def normalize_cross_sectional_weights(
     net_exposure: float,
     max_abs_weight: float | None,
 ) -> np.ndarray:
-    """Normalize cross-sectional weights date by date."""
+    """Project each date onto joint gross, net, and per-asset constraints."""
+
+    if gross_exposure < abs(net_exposure):
+        raise ValueError(
+            "infeasible portfolio constraints: gross_exposure must be at least "
+            f"abs(net_exposure); got gross={gross_exposure}, net={net_exposure}"
+        )
+    if max_abs_weight is not None and max_abs_weight <= 0.0:
+        raise ValueError(
+            "infeasible portfolio constraints: max_abs_weight must be positive; "
+            f"got {max_abs_weight}"
+        )
 
     normalized = np.zeros_like(weights, dtype=np.float64)
     batch_size, n_periods, _ = weights.shape
@@ -69,21 +80,83 @@ def normalize_cross_sectional_weights(
             valid = mask[batch_idx, period_idx]
             if not valid.any():
                 continue
-            row = np.asarray(weights[batch_idx, period_idx], dtype=np.float64).copy()
-            row[~valid] = 0.0
-            row_valid = row[valid]
-            row_valid = row_valid - row_valid.mean()
-            row_valid = row_valid + (net_exposure / max(int(valid.sum()), 1))
-            gross = np.abs(row_valid).sum()
-            if gross > 0:
-                row_valid = row_valid * (gross_exposure / gross)
-            if max_abs_weight is not None:
-                row_valid = np.clip(row_valid, -max_abs_weight, max_abs_weight)
-            row[:] = 0.0
-            row[valid] = row_valid
+            row = np.zeros(weights.shape[2], dtype=np.float64)
+            row_valid = np.asarray(weights[batch_idx, period_idx, valid], dtype=np.float64)
+            if not np.isfinite(row_valid).all():
+                raise ValueError("portfolio weights must be finite at available positions")
+            row[valid] = _project_weight_row(
+                row_valid,
+                gross_exposure=gross_exposure,
+                net_exposure=net_exposure,
+                max_abs_weight=max_abs_weight,
+            )
             normalized[batch_idx, period_idx] = row
 
     return normalized
+
+
+def _project_weight_row(
+    values: np.ndarray,
+    *,
+    gross_exposure: float,
+    net_exposure: float,
+    max_abs_weight: float | None,
+) -> np.ndarray:
+    long_total = 0.5 * (gross_exposure + net_exposure)
+    short_total = 0.5 * (gross_exposure - net_exposure)
+    cap = max_abs_weight if max_abs_weight is not None else max(gross_exposure, 1.0)
+    order = np.argsort(values, kind="stable")
+    best: np.ndarray | None = None
+    best_error = float("inf")
+    tolerance = 1e-12
+
+    for split in range(values.size + 1):
+        short_indices = order[:split]
+        long_indices = order[split:]
+        if short_total > cap * short_indices.size + tolerance:
+            continue
+        if long_total > cap * long_indices.size + tolerance:
+            continue
+        candidate = np.zeros_like(values)
+        candidate[short_indices] = -_project_capped_simplex(
+            -values[short_indices], short_total, cap
+        )
+        candidate[long_indices] = _project_capped_simplex(values[long_indices], long_total, cap)
+        error = float(np.sum((candidate - values) ** 2))
+        if error < best_error:
+            best = candidate
+            best_error = error
+
+    if best is None:
+        raise ValueError(
+            "infeasible portfolio constraints: available assets and max_abs_weight "
+            f"cannot support gross={gross_exposure}, net={net_exposure}, cap={max_abs_weight}"
+        )
+    return best
+
+
+def _project_capped_simplex(values: np.ndarray, total: float, cap: float) -> np.ndarray:
+    if total <= 0.0:
+        return np.zeros_like(values)
+    lower = float(np.min(values - cap))
+    upper = float(np.max(values))
+    for _ in range(100):
+        threshold = 0.5 * (lower + upper)
+        projected = np.clip(values - threshold, 0.0, cap)
+        if projected.sum() > total:
+            lower = threshold
+        else:
+            upper = threshold
+    projected = np.clip(values - upper, 0.0, cap)
+    residual = total - float(projected.sum())
+    if residual > 0.0:
+        for index in np.flatnonzero(projected < cap):
+            addition = min(residual, cap - projected[index])
+            projected[index] += addition
+            residual -= addition
+            if residual <= 1e-14:
+                break
+    return projected
 
 
 def apply_turnover_limit(
