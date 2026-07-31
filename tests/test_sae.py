@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+import torch  # noqa: F401
 
 from ml4t.models import AssetSignalResult, CrossSectionBatch, SAEConfig, SAEModel
-
-pytest.importorskip("torch")
 
 
 def test_sae_predicts_checkpointed_direct_signals() -> None:

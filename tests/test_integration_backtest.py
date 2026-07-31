@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
-import pytest
+from ml4t.specs import market_data as specs
 
 from ml4t.models import (
     AssetForecastResult,
@@ -53,8 +53,6 @@ def test_resolve_feed_spec_mapping_uses_nested_schema_metadata() -> None:
 
 
 def test_resolve_feed_spec_mapping_accepts_ml4t_specs_feedspec() -> None:
-    specs = pytest.importorskip("ml4t.specs.market_data")
-
     frame = {
         "date": np.array(["2024-01-01", "2024-01-01"], dtype=object),
         "ticker": np.array(["AAPL", "MSFT"], dtype=object),

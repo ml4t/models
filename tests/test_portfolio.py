@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+import torch  # noqa: F401
 
 from ml4t.models import (
     DeepPortfolioConfig,
@@ -14,8 +15,6 @@ from ml4t.models import (
     PortfolioSequenceBatch,
     WeightConstraintPostprocessor,
 )
-
-pytest.importorskip("torch")
 
 
 def test_deep_portfolio_trains_checkpointed_policy_and_predicts_weights() -> None:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+import torch  # noqa: F401
 
 from ml4t.models import (
     AssetSignalResult,
@@ -11,8 +12,6 @@ from ml4t.models import (
     StochasticDiscountFactorConfig,
     StochasticDiscountFactorModel,
 )
-
-pytest.importorskip("torch")
 
 
 def test_stochastic_discount_factor_extracts_weight_state_and_linear_mapping() -> None:
