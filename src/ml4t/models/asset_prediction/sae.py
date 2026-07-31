@@ -13,7 +13,11 @@ from ml4t.models._internal.latent_factor_utils import (
     select_checkpoint_epoch,
 )
 from ml4t.models._internal.lifecycle import atomic_fit
-from ml4t.models._internal.observability import observed_fit
+from ml4t.models._internal.observability import (
+    observed_fit,
+    restore_fit_record,
+    state_with_fit_record,
+)
 from ml4t.models._internal.persistence import (
     load_artifact,
     load_config,
@@ -264,12 +268,15 @@ class SAEModel(BaseAssetPredictionModel[SAEConfig]):
             path,
             model_type="ml4t.models.SAEModel",
             config=self.config,
-            state={
-                "asset_ids": self._asset_ids,
-                "n_features": self._n_features,
-                "history": self._history,
-                "checkpoint_tree": checkpoint_tree,
-            },
+            state=state_with_fit_record(
+                self,
+                {
+                    "asset_ids": self._asset_ids,
+                    "n_features": self._n_features,
+                    "history": self._history,
+                    "checkpoint_tree": checkpoint_tree,
+                },
+            ),
             arrays=arrays,
         )
 
@@ -290,6 +297,7 @@ class SAEModel(BaseAssetPredictionModel[SAEConfig]):
         model._history = tuple(artifact.state.get("history", ()))
         if not model._checkpoint_states:
             raise ValueError("artifact SAE has no checkpoints")
+        restore_fit_record(model, artifact.state)
         model._mark_fitted()
         return model
 

@@ -6,7 +6,11 @@ from pathlib import Path
 
 import numpy as np
 
-from ml4t.models._internal.observability import observed_fit
+from ml4t.models._internal.observability import (
+    observed_fit,
+    restore_fit_record,
+    state_with_fit_record,
+)
 from ml4t.models._internal.persistence import (
     load_artifact,
     load_config,
@@ -121,7 +125,7 @@ class AR1FactorForecaster(BaseFactorForecaster[AR1ForecasterConfig]):
             path,
             model_type="ml4t.models.AR1FactorForecaster",
             config=self.config,
-            state={},
+            state=state_with_fit_record(self, {}),
             arrays={
                 "intercepts": self._intercepts,
                 "slopes": self._slopes,
@@ -155,5 +159,6 @@ class AR1FactorForecaster(BaseFactorForecaster[AR1ForecasterConfig]):
             != 1
         ):
             raise ValueError("artifact AR(1) state dimensions disagree")
+        restore_fit_record(model, artifact.state)
         model._mark_fitted()
         return model

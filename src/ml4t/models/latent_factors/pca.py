@@ -6,7 +6,11 @@ from pathlib import Path
 
 import numpy as np
 
-from ml4t.models._internal.observability import observed_fit
+from ml4t.models._internal.observability import (
+    observed_fit,
+    restore_fit_record,
+    state_with_fit_record,
+)
 from ml4t.models._internal.persistence import (
     load_artifact,
     load_config,
@@ -135,7 +139,7 @@ class PCAModel(BaseLatentFactorModel[PCAConfig]):
             path,
             model_type="ml4t.models.PCAModel",
             config=self.config,
-            state={"asset_ids": self._asset_ids},
+            state=state_with_fit_record(self, {"asset_ids": self._asset_ids}),
             arrays={
                 "asset_mean": self._asset_mean,
                 "loadings": self._loadings,
@@ -160,6 +164,7 @@ class PCAModel(BaseLatentFactorModel[PCAConfig]):
             raise ValueError("artifact PCA asset dimensions disagree")
         if model._loadings.shape[1] != model.config.n_factors:
             raise ValueError("artifact PCA factor dimension disagrees with config")
+        restore_fit_record(model, artifact.state)
         model._mark_fitted()
         return model
 

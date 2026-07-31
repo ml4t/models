@@ -39,6 +39,12 @@ from ml4t.models import (
 )
 
 
+def _assert_run_record_preserved(original: object, recovered: object) -> None:
+    original_record = original.last_fit_record
+    assert original_record is not None
+    assert recovered.last_fit_record == original_record
+
+
 def test_pca_round_trip_survives_a_fresh_process(tmp_path: Path) -> None:
     batch = PersistentPanelBatch(
         returns=np.array([[1.0, 2.0], [2.0, 4.5], [4.0, 7.0]], dtype=np.float64),
@@ -51,6 +57,7 @@ def test_pca_round_trip_survives_a_fresh_process(tmp_path: Path) -> None:
 
     recovered = PCAModel.load(artifact)
     assert np.array_equal(recovered.extract(batch).asset_betas, expected)
+    _assert_run_record_preserved(model, recovered)
 
     command = [
         sys.executable,
@@ -59,7 +66,7 @@ def test_pca_round_trip_survives_a_fresh_process(tmp_path: Path) -> None:
             "import sys; from ml4t.models import PCAModel, PersistentPanelBatch; "
             "model=PCAModel.load(sys.argv[1]); "
             "batch=PersistentPanelBatch(timestamps=('t',), asset_ids=('A','B')); "
-            "print(model.extract(batch).asset_betas.shape)"
+            "print(model.extract(batch).asset_betas.shape, model.last_fit_record.model_name)"
         ),
         str(artifact),
     ]
@@ -71,7 +78,7 @@ def test_pca_round_trip_survives_a_fresh_process(tmp_path: Path) -> None:
         text=True,
         env=environment,
     )
-    assert result.stdout.strip() == "(1, 2, 1)"
+    assert result.stdout.strip() == "(1, 2, 1) pca"
 
 
 def test_numpy_model_artifacts_preserve_predictions(tmp_path: Path) -> None:
@@ -87,6 +94,7 @@ def test_numpy_model_artifacts_preserve_predictions(tmp_path: Path) -> None:
     actual_rp = recovered_rp.extract(panel)
     assert np.array_equal(actual_rp.asset_betas, expected_rp.asset_betas)
     assert np.array_equal(actual_rp.factor_returns, expected_rp.factor_returns)
+    _assert_run_record_preserved(rp_pca, recovered_rp)
 
     characteristics = rng.normal(size=(8, 4, 3))
     cross_section = CrossSectionBatch(
@@ -101,6 +109,7 @@ def test_numpy_model_artifacts_preserve_predictions(tmp_path: Path) -> None:
     actual_ipca = recovered_ipca.extract(cross_section)
     assert np.array_equal(actual_ipca.asset_betas, expected_ipca.asset_betas)
     assert np.array_equal(actual_ipca.factor_returns, expected_ipca.factor_returns)
+    _assert_run_record_preserved(ipca, recovered_ipca)
 
 
 @pytest.mark.parametrize(
@@ -122,6 +131,7 @@ def test_factor_forecaster_artifacts_preserve_predictions(
     recovered = type(forecaster).load(forecaster.save(tmp_path / "forecaster.ml4t"))
 
     assert np.array_equal(recovered.predict(future).factor_premia, expected)
+    _assert_run_record_preserved(forecaster, recovered)
 
 
 def test_linear_portfolio_artifact_preserves_predictions(tmp_path: Path) -> None:
@@ -138,6 +148,7 @@ def test_linear_portfolio_artifact_preserves_predictions(tmp_path: Path) -> None
     recovered = LinearFeaturePortfolioModel.load(model.save(tmp_path / "linear.ml4t"))
 
     assert np.array_equal(recovered.predict(batch).weights, expected)
+    _assert_run_record_preserved(model, recovered)
 
 
 def test_artifact_loader_rejects_the_wrong_model_type(tmp_path: Path) -> None:
@@ -175,6 +186,7 @@ def test_cae_and_sae_artifacts_preserve_predictions(tmp_path: Path) -> None:
     expected_cae = cae.extract(future).asset_betas
     recovered_cae = CAEModel.load(cae.save(tmp_path / "cae.ml4t"))
     assert np.array_equal(recovered_cae.extract(future).asset_betas, expected_cae)
+    _assert_run_record_preserved(cae, recovered_cae)
 
     sae = SAEModel(
         SAEConfig(
@@ -191,6 +203,7 @@ def test_cae_and_sae_artifacts_preserve_predictions(tmp_path: Path) -> None:
     expected_sae = sae.predict(future).signal_values
     recovered_sae = SAEModel.load(sae.save(tmp_path / "sae.ml4t"))
     assert np.array_equal(recovered_sae.predict(future).signal_values, expected_sae)
+    _assert_run_record_preserved(sae, recovered_sae)
 
 
 @pytest.mark.parametrize(
@@ -237,6 +250,7 @@ def test_neural_portfolio_artifacts_preserve_predictions(
     recovered = type(model).load(model.save(tmp_path / "portfolio.ml4t"))
 
     assert np.array_equal(recovered.predict(future).weights, expected)
+    _assert_run_record_preserved(model, recovered)
 
 
 def test_sdf_model_and_heads_preserve_predictions(tmp_path: Path) -> None:
@@ -267,6 +281,7 @@ def test_sdf_model_and_heads_preserve_predictions(tmp_path: Path) -> None:
     recovered_sdf = StochasticDiscountFactorModel.load(sdf.save(tmp_path / "sdf.ml4t"))
     recovered_state = recovered_sdf.extract(batch, checkpoint=("conditional", 1))
     assert np.array_equal(recovered_state.asset_weights, expected_state.asset_weights)
+    _assert_run_record_preserved(sdf, recovered_sdf)
 
     mapper = LinearStochasticDiscountFactorReturnMapper()
     mapper.fit(expected_state, batch)
@@ -277,6 +292,7 @@ def test_sdf_model_and_heads_preserve_predictions(tmp_path: Path) -> None:
     assert np.array_equal(
         recovered_mapper.predict(expected_state).expected_returns, expected_forecast
     )
+    _assert_run_record_preserved(mapper, recovered_mapper)
 
     head = StochasticDiscountFactorBetaNetworkHead(config)
     head.fit(expected_state, batch)
@@ -287,3 +303,4 @@ def test_sdf_model_and_heads_preserve_predictions(tmp_path: Path) -> None:
     assert np.array_equal(
         recovered_head.predict(batch, checkpoint=1).signal_values, expected_signal
     )
+    _assert_run_record_preserved(head, recovered_head)

@@ -12,7 +12,11 @@ from torch import nn
 
 from ml4t.models._internal.latent_factor_utils import select_checkpoint_epoch
 from ml4t.models._internal.lifecycle import atomic_fit
-from ml4t.models._internal.observability import observed_fit
+from ml4t.models._internal.observability import (
+    observed_fit,
+    restore_fit_record,
+    state_with_fit_record,
+)
 from ml4t.models._internal.persistence import (
     load_artifact,
     load_config,
@@ -344,15 +348,18 @@ class DeepPortfolioModel(BasePortfolioModel):
             path,
             model_type="ml4t.models.DeepPortfolioModel",
             config=self.config,
-            state={
-                "asset_ids": self._asset_ids,
-                "n_assets": self._n_assets,
-                "n_features": self._n_features,
-                "n_groups": self._n_groups,
-                "history": self._history,
-                "has_adjacency_mask": self._adjacency_mask is not None,
-                "checkpoint_tree": checkpoint_tree,
-            },
+            state=state_with_fit_record(
+                self,
+                {
+                    "asset_ids": self._asset_ids,
+                    "n_assets": self._n_assets,
+                    "n_features": self._n_features,
+                    "n_groups": self._n_groups,
+                    "history": self._history,
+                    "has_adjacency_mask": self._adjacency_mask is not None,
+                    "checkpoint_tree": checkpoint_tree,
+                },
+            ),
             arrays=arrays,
         )
 
@@ -408,6 +415,7 @@ class DeepPortfolioModel(BasePortfolioModel):
             model._n_assets,
         ):
             raise ValueError("artifact DeepPortfolio adjacency dimensions disagree")
+        restore_fit_record(model, artifact.state)
         model._mark_fitted()
         return model
 

@@ -18,6 +18,7 @@ from ml4t.models import (
     PersistentPanelBatch,
     PortfolioSequenceBatch,
 )
+from ml4t.models._internal.observability import FitObservable, state_with_fit_record
 from ml4t.models.portfolio import runtime as portfolio_runtime
 
 
@@ -84,6 +85,11 @@ def test_failed_fit_retains_redacted_attempt_record() -> None:
     assert record.stopping_reason == "failed"
     assert record.error_type == "ValueError"
     assert "SECRET" not in json.dumps(asdict(record), sort_keys=True)
+
+
+def test_persistence_rejects_a_fitted_surface_without_a_run_record() -> None:
+    with pytest.raises(RuntimeError, match="has no fit run record"):
+        state_with_fit_record(FitObservable(), {})
 
 
 def test_portfolio_fit_records_early_stopping(monkeypatch: pytest.MonkeyPatch) -> None:

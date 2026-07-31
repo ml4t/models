@@ -11,7 +11,11 @@ import numpy as np
 
 from ml4t.models._internal.latent_factor_utils import select_checkpoint_epoch
 from ml4t.models._internal.lifecycle import atomic_fit
-from ml4t.models._internal.observability import observed_fit
+from ml4t.models._internal.observability import (
+    observed_fit,
+    restore_fit_record,
+    state_with_fit_record,
+)
 from ml4t.models._internal.persistence import (
     load_artifact,
     load_config,
@@ -431,14 +435,17 @@ class CAEModel(BaseLatentFactorModel[CAEConfig]):
             path,
             model_type="ml4t.models.CAEModel",
             config=self.config,
-            state={
-                "asset_ids": self._asset_ids,
-                "n_characteristics": self._n_characteristics,
-                "n_instruments": self._n_instruments,
-                "history": self._history,
-                "fit_default_checkpoint": self._fit_default_checkpoint,
-                "checkpoint_tree": checkpoint_tree,
-            },
+            state=state_with_fit_record(
+                self,
+                {
+                    "asset_ids": self._asset_ids,
+                    "n_characteristics": self._n_characteristics,
+                    "n_instruments": self._n_instruments,
+                    "history": self._history,
+                    "fit_default_checkpoint": self._fit_default_checkpoint,
+                    "checkpoint_tree": checkpoint_tree,
+                },
+            ),
             arrays=arrays,
         )
 
@@ -466,6 +473,7 @@ class CAEModel(BaseLatentFactorModel[CAEConfig]):
             len(states) != model.config.n_ensemble for states in model._checkpoint_states.values()
         ):
             raise ValueError("artifact CAE ensemble size disagrees with config")
+        restore_fit_record(model, artifact.state)
         model._mark_fitted()
         return model
 

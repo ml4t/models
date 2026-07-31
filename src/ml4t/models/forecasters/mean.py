@@ -6,7 +6,11 @@ from pathlib import Path
 
 import numpy as np
 
-from ml4t.models._internal.observability import observed_fit
+from ml4t.models._internal.observability import (
+    observed_fit,
+    restore_fit_record,
+    state_with_fit_record,
+)
 from ml4t.models._internal.persistence import (
     load_artifact,
     load_config,
@@ -67,7 +71,7 @@ class ExpandingMeanFactorForecaster(BaseFactorForecaster[ExpandingMeanForecaster
             path,
             model_type="ml4t.models.ExpandingMeanFactorForecaster",
             config=self.config,
-            state={},
+            state=state_with_fit_record(self, {}),
             arrays={"mean_factor_premium": self._mean_factor_premium},
         )
 
@@ -89,5 +93,6 @@ class ExpandingMeanFactorForecaster(BaseFactorForecaster[ExpandingMeanForecaster
             "mean_factor_premium",
             ndim=1,
         )
+        restore_fit_record(model, artifact.state)
         model._mark_fitted()
         return model
