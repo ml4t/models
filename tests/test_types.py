@@ -48,3 +48,14 @@ def test_portfolio_sequence_batch_normalizes_cost_shape() -> None:
     )
     assert batch.costs is not None
     assert batch.costs.shape == (3, 1)
+
+
+@pytest.mark.parametrize("timestamps", [("t1", "t2"), ("t1", "t2", "t3", "t4", "t5")])
+def test_portfolio_sequence_batch_rejects_misaligned_timestamps(
+    timestamps: tuple[str, ...],
+) -> None:
+    with pytest.raises(ValueError, match=r"timestamps.*expected 4.*got"):
+        PortfolioSequenceBatch(
+            features=np.zeros((2, 4, 3, 5), dtype=np.float64),
+            timestamps=timestamps,
+        )

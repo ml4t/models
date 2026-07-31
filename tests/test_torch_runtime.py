@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import pytest
+
 from ml4t.models._internal.torch_runtime import resolve_device, seed_torch
 
 
@@ -20,6 +22,9 @@ class _FakeCuda:
 
     def manual_seed_all(self, seed: int) -> None:
         self.seeds.append(seed)
+
+    def device_count(self) -> int:
+        return 1 if self.available else 0
 
 
 class _FakeMPSBackend:
@@ -72,10 +77,11 @@ def test_resolve_device_normalizes_cuda_request() -> None:
     assert resolve_device(torch, " CUDA:0 ").type == "cuda"
 
 
-def test_resolve_device_cuda_falls_back_to_cpu() -> None:
+def test_resolve_device_rejects_unavailable_cuda() -> None:
     torch = _FakeTorch(cuda_available=False)
 
-    assert resolve_device(torch, "cuda:0").type == "cpu"
+    with pytest.raises(RuntimeError, match="CUDA"):
+        resolve_device(torch, "cuda:0")
 
 
 def test_resolve_device_mps_when_available() -> None:
@@ -84,10 +90,11 @@ def test_resolve_device_mps_when_available() -> None:
     assert resolve_device(torch, "mps").type == "mps"
 
 
-def test_resolve_device_mps_falls_back_to_cpu() -> None:
+def test_resolve_device_rejects_unavailable_mps() -> None:
     torch = _FakeTorch(mps_available=False)
 
-    assert resolve_device(torch, "mps").type == "cpu"
+    with pytest.raises(RuntimeError, match="MPS"):
+        resolve_device(torch, "mps")
 
 
 def test_seed_torch_dispatches_by_device() -> None:

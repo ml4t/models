@@ -173,7 +173,7 @@ class PortfolioSequenceBatch:
         object.__setattr__(self, "vol_scale", vol_scale)
         object.__setattr__(self, "prev_weights", prev_weights)
 
-        batch_size, _, n_assets, _ = features.shape
+        batch_size, n_periods, n_assets, _ = features.shape
         if returns is not None and returns.shape[:2] != features.shape[:2]:
             raise ValueError("returns and features disagree on (B, T)")
         if returns is not None and returns.shape[2] != n_assets:
@@ -201,6 +201,10 @@ class PortfolioSequenceBatch:
             raise ValueError("adjacency_mask must have shape (N, N)")
         if self.asset_ids and len(self.asset_ids) != n_assets:
             raise ValueError("asset_ids length does not match N")
+        if self.timestamps and len(self.timestamps) != n_periods:
+            raise ValueError(
+                f"timestamps length mismatch: expected {n_periods}, got {len(self.timestamps)}"
+            )
 
     @property
     def batch_size(self) -> int:
