@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 
 import pytest
@@ -49,9 +50,17 @@ class _FakeTorch:
 
     def __init__(self, *, cuda_available: bool = False, mps_available: bool = False) -> None:
         self.cuda = _FakeCuda(cuda_available)
-        self.backends = type("Backends", (), {"mps": _FakeMPSBackend(mps_available)})()
+        self.backends = type(
+            "Backends",
+            (),
+            {
+                "mps": _FakeMPSBackend(mps_available),
+                "cudnn": type("Cudnn", (), {"benchmark": True, "deterministic": False})(),
+            },
+        )()
         self.mps = _FakeMPS()
         self.seeds: list[int] = []
+        self.deterministic_calls: list[bool] = []
 
     def device(self, requested: str) -> _FakeDevice:
         if requested != requested.strip().lower():
@@ -60,6 +69,9 @@ class _FakeTorch:
 
     def manual_seed(self, seed: int) -> None:
         self.seeds.append(seed)
+
+    def use_deterministic_algorithms(self, enabled: bool) -> None:
+        self.deterministic_calls.append(enabled)
 
 
 def test_resolve_device_cpu() -> None:
@@ -125,7 +137,8 @@ def test_resolve_dtype_rejects_unknown_precision() -> None:
         resolve_dtype(_FakeTorch(), "float16")
 
 
-def test_seed_torch_dispatches_by_device() -> None:
+def test_seed_torch_dispatches_by_device(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("CUBLAS_WORKSPACE_CONFIG", raising=False)
     torch = _FakeTorch(cuda_available=True, mps_available=True)
 
     seed_torch(torch, 11, _FakeDevice("cpu"))
@@ -135,6 +148,10 @@ def test_seed_torch_dispatches_by_device() -> None:
     assert torch.seeds == [11, 13, 17]
     assert torch.cuda.seeds == [13]
     assert torch.mps.seeds == [17]
+    assert torch.deterministic_calls == [True]
+    assert torch.backends.cudnn.benchmark is False
+    assert torch.backends.cudnn.deterministic is True
+    assert os.environ["CUBLAS_WORKSPACE_CONFIG"] == ":4096:8"
 
 
 def test_seed_torch_allows_mps_without_manual_seed() -> None:
