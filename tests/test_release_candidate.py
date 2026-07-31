@@ -25,22 +25,22 @@ def test_candidate_manifest_binds_artifacts_to_source_identity(candidate_dir: Pa
         candidate_dir,
         expected_commit="a" * 40,
         expected_tree="b" * 40,
-        expected_tag="v0.1.0b0",
+        expected_tag="v0.1.0",
     )
 
     manifest = json.loads((candidate_dir / "candidate.json").read_text(encoding="utf-8"))
 
     assert manifest["name"] == "ml4t-models"
-    assert manifest["version"] == "0.1.0b0"
+    assert manifest["version"] == "0.1.0"
     assert {record["filename"] for record in manifest["artifacts"]} == {
-        "ml4t_models-0.1.0b0-py3-none-any.whl",
-        "ml4t_models-0.1.0b0.tar.gz",
+        "ml4t_models-0.1.0-py3-none-any.whl",
+        "ml4t_models-0.1.0.tar.gz",
     }
 
 
 def test_candidate_verification_rejects_wrong_tag(candidate_dir: Path) -> None:
     with pytest.raises(ValueError, match="does not match candidate version"):
-        candidate.verify(candidate_dir, expected_tag="v0.1.0")
+        candidate.verify(candidate_dir, expected_tag="v0.1.0b0")
 
 
 def test_candidate_verification_rejects_modified_artifact(candidate_dir: Path) -> None:
@@ -64,8 +64,11 @@ def test_candidate_contains_typing_and_documentation_contracts(candidate_dir: Pa
     wheel, sdist = candidate._distribution_files(candidate_dir)
     with zipfile.ZipFile(wheel) as archive:
         wheel_members = set(archive.namelist())
+        metadata_name = next(name for name in wheel_members if name.endswith(".dist-info/METADATA"))
+        metadata = archive.read(metadata_name).decode()
     assert "ml4t/models/_version.py" in wheel_members
     assert "ml4t/models/py.typed" in wheel_members
+    assert "Development Status :: 5 - Production/Stable" in metadata
 
     with tarfile.open(sdist, "r:gz") as archive:
         sdist_members = {member.name.partition("/")[2] for member in archive.getmembers()}
