@@ -169,11 +169,21 @@ class LSTMPortfolioModel(BasePortfolioModel):
         validation_batch = validation_batch or batch
         validate_portfolio_training_batch(validation_batch, self.config)
         if batch.n_assets != validation_batch.n_assets:
-            raise ValueError("train and validation batches must share the asset dimension")
+            raise ValueError(
+                "train and validation batches must share the asset dimension: "
+                f"expected {batch.n_assets}, got {validation_batch.n_assets}"
+            )
         if batch.features.shape[3] != validation_batch.features.shape[3]:
-            raise ValueError("train and validation batches must share the feature dimension")
+            raise ValueError(
+                "train and validation batches must share the feature dimension: "
+                f"expected {batch.features.shape[3]}, got {validation_batch.features.shape[3]}"
+            )
         if batch.asset_ids != validation_batch.asset_ids:
-            raise ValueError("train and validation batches must share asset_ids")
+            raise ValueError(
+                "train and validation batches must share asset_ids in the same order; "
+                f"expected {len(batch.asset_ids)} identifiers, got "
+                f"{len(validation_batch.asset_ids)} identifiers with different identity or order"
+            )
 
         device = resolve_device(torch, self.config.device)
         dtype = resolve_dtype(torch, self.config.dtype)
@@ -219,8 +229,16 @@ class LSTMPortfolioModel(BasePortfolioModel):
         validate_portfolio_prediction_batch(batch, self.config)
         if not self.is_fitted or self._n_assets is None or self._n_features is None:
             raise RuntimeError("LSTMPortfolioModel must be fitted before predict()")
-        if batch.n_assets != self._n_assets or batch.features.shape[3] != self._n_features:
-            raise ValueError("prediction batch shape does not match the fitted model")
+        if batch.n_assets != self._n_assets:
+            raise ValueError(
+                "prediction batch asset dimension does not match the fitted model: "
+                f"expected {self._n_assets}, got {batch.n_assets}"
+            )
+        if batch.features.shape[3] != self._n_features:
+            raise ValueError(
+                "prediction batch feature dimension does not match the fitted model: "
+                f"expected {self._n_features}, got {batch.features.shape[3]}"
+            )
         validate_portfolio_identity(batch, self._asset_ids)
 
         device = resolve_device(torch, self.config.device)

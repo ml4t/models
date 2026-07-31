@@ -43,7 +43,10 @@ def test_persistent_panel_requires_shape_information() -> None:
 
 
 def test_persistent_panel_rejects_characteristic_and_return_misalignment() -> None:
-    with pytest.raises(ValueError, match="characteristics and returns disagree"):
+    with pytest.raises(
+        ValueError,
+        match=r"characteristics and returns disagree.*expected \(2, 3\).*got \(2, 4\)",
+    ):
         PersistentPanelBatch(
             returns=np.ones((2, 3)),
             characteristics=np.ones((2, 4, 1)),
@@ -51,7 +54,7 @@ def test_persistent_panel_rejects_characteristic_and_return_misalignment() -> No
 
 
 def test_persistent_panel_rejects_timestamp_misalignment() -> None:
-    with pytest.raises(ValueError, match="timestamps length"):
+    with pytest.raises(ValueError, match=r"timestamps length mismatch: expected 2, got 1"):
         PersistentPanelBatch(returns=np.ones((2, 3)), timestamps=("t1",))
 
 
@@ -165,7 +168,7 @@ def test_portfolio_sequence_batch_rejects_misaligned_timestamps(
     ],
 )
 def test_result_types_reject_timestamp_misalignment(factory: Callable[[], object]) -> None:
-    with pytest.raises(ValueError, match="timestamps length"):
+    with pytest.raises(ValueError, match=r"timestamps length mismatch: expected 2, got 1"):
         factory()
 
 
@@ -205,7 +208,10 @@ def test_panel_and_result_types_reject_invalid_asset_ids(
 
 
 def test_latent_factor_state_validates_factor_shape_and_reports_dimensions() -> None:
-    with pytest.raises(ValueError, match=r"factor_returns must have shape \(T, K\)"):
+    with pytest.raises(
+        ValueError,
+        match=r"factor_returns must have shape \(T, K\): expected \(2, 1\), got \(2, 2\)",
+    ):
         LatentFactorState(
             asset_betas=np.ones((2, 3, 1)),
             factor_returns=np.ones((2, 2)),
@@ -221,7 +227,10 @@ def test_latent_factor_state_validates_factor_shape_and_reports_dimensions() -> 
 
 
 def test_stochastic_discount_factor_state_validates_values_and_reports_dimensions() -> None:
-    with pytest.raises(ValueError, match=r"sdf_values must have shape \(T,\)"):
+    with pytest.raises(
+        ValueError,
+        match=r"sdf_values must have shape \(T,\): expected \(2,\), got \(3,\)",
+    ):
         StochasticDiscountFactorState(
             asset_weights=np.ones((2, 3)),
             sdf_values=np.ones(3),

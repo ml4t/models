@@ -29,8 +29,9 @@ def validate_portfolio_identity(
 ) -> None:
     if batch.asset_ids != fitted_asset_ids:
         raise ValueError(
-            "prediction asset_ids must exactly match fitted asset_ids; "
-            f"expected {fitted_asset_ids}, got {batch.asset_ids}"
+            "prediction asset_ids must exactly match fitted asset_ids in the same order; "
+            f"expected {len(fitted_asset_ids)} identifiers, got {len(batch.asset_ids)} "
+            "identifiers with different identity or order"
         )
 
 

@@ -184,7 +184,9 @@ def _resolve_asset_order(
         return np.arange(len(fitted) if fitted else n_assets, dtype=np.int64)
     if set(requested) != set(fitted):
         raise ValueError(
-            f"prediction asset_ids must match fitted asset_ids; expected {fitted}, got {requested}"
+            "prediction asset_ids must contain the fitted asset identities; "
+            f"expected {len(fitted)} identifiers, got {len(requested)} identifiers with a "
+            "different identity set"
         )
     fitted_index = {asset: index for index, asset in enumerate(fitted)}
     return np.asarray([fitted_index[asset] for asset in requested], dtype=np.int64)
