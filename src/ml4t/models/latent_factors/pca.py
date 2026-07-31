@@ -2,8 +2,17 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 
+from ml4t.models._internal.persistence import (
+    load_artifact,
+    load_config,
+    require_array,
+    require_array_names,
+    save_artifact,
+)
 from ml4t.models.api import PanelBatch
 from ml4t.models.configs import PCAConfig
 from ml4t.models.latent_factors.base import BaseLatentFactorModel
@@ -89,6 +98,46 @@ class PCAModel(BaseLatentFactorModel[PCAConfig]):
                 "persistent_entities": True,
             },
         )
+
+    def save(self, path: str | Path) -> Path:
+        if (
+            not self.is_fitted
+            or self._asset_mean is None
+            or self._loadings is None
+            or self._train_factor_returns is None
+        ):
+            raise RuntimeError("PCA model must be fitted before save()")
+        return save_artifact(
+            path,
+            model_type="ml4t.models.PCAModel",
+            config=self.config,
+            state={"asset_ids": self._asset_ids},
+            arrays={
+                "asset_mean": self._asset_mean,
+                "loadings": self._loadings,
+                "train_factor_returns": self._train_factor_returns,
+            },
+        )
+
+    @classmethod
+    def load(cls, path: str | Path, *, device: str | None = None) -> PCAModel:
+        artifact = load_artifact(path, expected_model_type="ml4t.models.PCAModel")
+        require_array_names(artifact, {"asset_mean", "loadings", "train_factor_returns"})
+        model = cls(load_config(artifact, PCAConfig, device=device))
+        model._asset_mean = require_array(artifact, "asset_mean", ndim=1)
+        model._loadings = require_array(artifact, "loadings", ndim=2)
+        model._train_factor_returns = require_array(
+            artifact,
+            "train_factor_returns",
+            ndim=2,
+        )
+        model._asset_ids = tuple(artifact.state.get("asset_ids", ()))
+        if model._loadings.shape[0] != model._asset_mean.shape[0]:
+            raise ValueError("artifact PCA asset dimensions disagree")
+        if model._loadings.shape[1] != model.config.n_factors:
+            raise ValueError("artifact PCA factor dimension disagrees with config")
+        model._mark_fitted()
+        return model
 
 
 def _require_persistent_panel(batch: PanelBatch) -> PersistentPanelBatch:

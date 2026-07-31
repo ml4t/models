@@ -2,8 +2,17 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 
+from ml4t.models._internal.persistence import (
+    load_artifact,
+    load_config,
+    require_array,
+    require_array_names,
+    save_artifact,
+)
 from ml4t.models.configs import AR1ForecasterConfig
 from ml4t.models.forecasters.base import BaseFactorForecaster
 from ml4t.models.types import FactorForecastResult, FitSummary, LatentFactorState
@@ -81,3 +90,53 @@ class AR1FactorForecaster(BaseFactorForecaster[AR1ForecasterConfig]):
             timestamps=state.timestamps,
             metadata={"model_name": self.config.model_name},
         )
+
+    def save(self, path: str | Path) -> Path:
+        if (
+            not self.is_fitted
+            or self._intercepts is None
+            or self._slopes is None
+            or self._last_values is None
+            or self._fallback_mean is None
+        ):
+            raise RuntimeError("AR1FactorForecaster must be fitted before save()")
+        return save_artifact(
+            path,
+            model_type="ml4t.models.AR1FactorForecaster",
+            config=self.config,
+            state={},
+            arrays={
+                "intercepts": self._intercepts,
+                "slopes": self._slopes,
+                "last_values": self._last_values,
+                "fallback_mean": self._fallback_mean,
+            },
+        )
+
+    @classmethod
+    def load(cls, path: str | Path, *, device: str | None = None) -> AR1FactorForecaster:
+        artifact = load_artifact(path, expected_model_type="ml4t.models.AR1FactorForecaster")
+        names = {"intercepts", "slopes", "last_values", "fallback_mean"}
+        require_array_names(artifact, names)
+        model = cls(load_config(artifact, AR1ForecasterConfig, device=device))
+        model._intercepts = require_array(artifact, "intercepts", ndim=1)
+        model._slopes = require_array(artifact, "slopes", ndim=1)
+        model._last_values = require_array(artifact, "last_values", ndim=1)
+        model._fallback_mean = require_array(artifact, "fallback_mean", ndim=1)
+        if (
+            len(
+                {
+                    array.shape
+                    for array in (
+                        model._intercepts,
+                        model._slopes,
+                        model._last_values,
+                        model._fallback_mean,
+                    )
+                }
+            )
+            != 1
+        ):
+            raise ValueError("artifact AR(1) state dimensions disagree")
+        model._mark_fitted()
+        return model

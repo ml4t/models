@@ -2,8 +2,17 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 
+from ml4t.models._internal.persistence import (
+    load_artifact,
+    load_config,
+    require_array,
+    require_array_names,
+    save_artifact,
+)
 from ml4t.models.configs import ExpandingMeanForecasterConfig
 from ml4t.models.forecasters.base import BaseFactorForecaster
 from ml4t.models.types import FactorForecastResult, FitSummary, LatentFactorState
@@ -44,3 +53,35 @@ class ExpandingMeanFactorForecaster(BaseFactorForecaster[ExpandingMeanForecaster
             timestamps=state.timestamps,
             metadata={"model_name": self.config.model_name},
         )
+
+    def save(self, path: str | Path) -> Path:
+        if not self.is_fitted or self._mean_factor_premium is None:
+            raise RuntimeError("ExpandingMeanFactorForecaster must be fitted before save()")
+        return save_artifact(
+            path,
+            model_type="ml4t.models.ExpandingMeanFactorForecaster",
+            config=self.config,
+            state={},
+            arrays={"mean_factor_premium": self._mean_factor_premium},
+        )
+
+    @classmethod
+    def load(
+        cls,
+        path: str | Path,
+        *,
+        device: str | None = None,
+    ) -> ExpandingMeanFactorForecaster:
+        artifact = load_artifact(
+            path,
+            expected_model_type="ml4t.models.ExpandingMeanFactorForecaster",
+        )
+        require_array_names(artifact, {"mean_factor_premium"})
+        model = cls(load_config(artifact, ExpandingMeanForecasterConfig, device=device))
+        model._mean_factor_premium = require_array(
+            artifact,
+            "mean_factor_premium",
+            ndim=1,
+        )
+        model._mark_fitted()
+        return model

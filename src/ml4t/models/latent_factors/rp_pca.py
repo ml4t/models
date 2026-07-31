@@ -2,8 +2,17 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 
+from ml4t.models._internal.persistence import (
+    load_artifact,
+    load_config,
+    require_array,
+    require_array_names,
+    save_artifact,
+)
 from ml4t.models.api import PanelBatch
 from ml4t.models.configs import RPPCAConfig
 from ml4t.models.latent_factors.base import BaseLatentFactorModel
@@ -138,6 +147,52 @@ class RPPCAModel(BaseLatentFactorModel[RPPCAConfig]):
             asset_ids=persistent.asset_ids or self._asset_ids,
             metadata=metadata,
         )
+
+    def save(self, path: str | Path) -> Path:
+        if (
+            not self.is_fitted
+            or self._asset_betas is None
+            or self._factor_weights is None
+            or self._train_factor_returns is None
+            or self._eigenvalues is None
+        ):
+            raise RuntimeError("RP-PCA model must be fitted before save()")
+        return save_artifact(
+            path,
+            model_type="ml4t.models.RPPCAModel",
+            config=self.config,
+            state={"asset_ids": self._asset_ids},
+            arrays={
+                "asset_betas": self._asset_betas,
+                "factor_weights": self._factor_weights,
+                "train_factor_returns": self._train_factor_returns,
+                "eigenvalues": self._eigenvalues,
+            },
+        )
+
+    @classmethod
+    def load(cls, path: str | Path, *, device: str | None = None) -> RPPCAModel:
+        artifact = load_artifact(path, expected_model_type="ml4t.models.RPPCAModel")
+        require_array_names(
+            artifact,
+            {"asset_betas", "factor_weights", "train_factor_returns", "eigenvalues"},
+        )
+        model = cls(load_config(artifact, RPPCAConfig, device=device))
+        model._asset_betas = require_array(artifact, "asset_betas", ndim=2)
+        model._factor_weights = require_array(artifact, "factor_weights", ndim=2)
+        model._train_factor_returns = require_array(
+            artifact,
+            "train_factor_returns",
+            ndim=2,
+        )
+        model._eigenvalues = require_array(artifact, "eigenvalues", ndim=1)
+        model._asset_ids = tuple(artifact.state.get("asset_ids", ()))
+        if model._asset_betas.shape != model._factor_weights.shape:
+            raise ValueError("artifact RP-PCA fitted matrices disagree")
+        if model._asset_betas.shape[1] != model.config.n_factors:
+            raise ValueError("artifact RP-PCA factor dimension disagrees with config")
+        model._mark_fitted()
+        return model
 
 
 def _require_persistent_panel(batch: PanelBatch) -> PersistentPanelBatch:
