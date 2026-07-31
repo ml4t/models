@@ -22,6 +22,7 @@ STABLE_ROOT_EXPORTS = (
     "ExpandingMeanForecasterConfig",
     "FactorForecastResult",
     "FactorForecaster",
+    "FitRunRecord",
     "FitSummary",
     "IPCAConfig",
     "IPCAModel",

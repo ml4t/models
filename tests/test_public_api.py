@@ -38,6 +38,7 @@ def test_stable_submodules_have_explicit_supported_exports() -> None:
         "AssetWeightsResult",
         "CrossSectionBatch",
         "FactorForecastResult",
+        "FitRunRecord",
         "FitSummary",
         "LatentFactorPrediction",
         "LatentFactorState",

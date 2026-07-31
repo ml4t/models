@@ -9,6 +9,7 @@ from ml4t.models.types import (
     AssetSignalResult,
     CrossSectionBatch,
     FactorForecastResult,
+    FitRunRecord,
     FitSummary,
     LatentFactorState,
     PersistentPanelBatch,
@@ -35,6 +36,7 @@ class LatentFactorModel(Protocol):
 
     is_fitted: bool
     available_checkpoints: tuple[int, ...]
+    last_fit_record: FitRunRecord | None
 
     def fit(self, batch: PanelBatch) -> FitSummary: ...
 
@@ -50,6 +52,7 @@ class FactorForecaster(Protocol):
     """Protocol for factor-premium forecasters."""
 
     is_fitted: bool
+    last_fit_record: FitRunRecord | None
 
     def fit(self, state: LatentFactorState) -> FitSummary: ...
 
@@ -71,6 +74,7 @@ class PortfolioModel(Protocol):
 
     is_fitted: bool
     available_checkpoints: tuple[int, ...]
+    last_fit_record: FitRunRecord | None
 
     def fit(
         self,
@@ -102,6 +106,7 @@ class AssetPredictionModel(Protocol):
 
     is_fitted: bool
     available_checkpoints: tuple[int, ...]
+    last_fit_record: FitRunRecord | None
 
     def fit(
         self,
@@ -123,6 +128,7 @@ class StochasticDiscountFactorEstimator(Protocol):
 
     is_fitted: bool
     available_checkpoints: tuple[tuple[str, int], ...]
+    last_fit_record: FitRunRecord | None
 
     def fit(self, batch: CrossSectionBatch) -> FitSummary: ...
 

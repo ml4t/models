@@ -4,18 +4,20 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
+from ml4t.models._internal.observability import FitObservable
 from ml4t.models.configs import StochasticDiscountFactorConfig
 from ml4t.models.types import CrossSectionBatch, FitSummary, StochasticDiscountFactorState
 
 type SDFCheckpoint = tuple[str, int]
 
 
-class BaseStochasticDiscountFactorModel(ABC):
+class BaseStochasticDiscountFactorModel(FitObservable, ABC):
     """Abstract base for stochastic discount factor models."""
 
     def __init__(self, config: StochasticDiscountFactorConfig) -> None:
         self.config = config
         self._is_fitted = False
+        self._last_fit_record = None
 
     @property
     def is_fitted(self) -> bool:

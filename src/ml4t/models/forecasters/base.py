@@ -6,16 +6,18 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
+from ml4t.models._internal.observability import FitObservable
 from ml4t.models.configs.base import BaseModelConfig
 from ml4t.models.types import FactorForecastResult, FitSummary, LatentFactorState
 
 
-class BaseFactorForecaster[ConfigT: BaseModelConfig](ABC):
+class BaseFactorForecaster[ConfigT: BaseModelConfig](FitObservable, ABC):
     """Abstract base for factor-premium forecasters."""
 
     def __init__(self, config: ConfigT) -> None:
         self.config = config
         self._is_fitted = False
+        self._last_fit_record = None
 
     @property
     def is_fitted(self) -> bool:

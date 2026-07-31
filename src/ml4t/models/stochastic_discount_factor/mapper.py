@@ -13,6 +13,7 @@ from ml4t.models._internal.latent_factor_utils import (
     select_checkpoint_epoch,
 )
 from ml4t.models._internal.lifecycle import atomic_fit
+from ml4t.models._internal.observability import FitObservable, observed_fit
 from ml4t.models._internal.persistence import (
     load_artifact,
     load_config,
@@ -38,10 +39,12 @@ from ml4t.models.types import (
 )
 
 
-class LinearStochasticDiscountFactorReturnMapper:
+class LinearStochasticDiscountFactorReturnMapper(FitObservable):
     """Map stochastic discount factor weights to expected returns via a fitted linear projection."""
 
     def __init__(self) -> None:
+        self.config = MapperConfig(model_name="linear_stochastic_discount_factor_return")
+        self._last_fit_record = None
         self._intercept = 0.0
         self._slope = 0.0
         self._is_fitted = False
@@ -50,6 +53,7 @@ class LinearStochasticDiscountFactorReturnMapper:
     def is_fitted(self) -> bool:
         return self._is_fitted
 
+    @observed_fit
     def fit(self, state: StochasticDiscountFactorState, batch: CrossSectionBatch) -> FitSummary:
         if batch.returns is None:
             raise ValueError(
@@ -105,7 +109,7 @@ class LinearStochasticDiscountFactorReturnMapper:
         return save_artifact(
             path,
             model_type="ml4t.models.LinearStochasticDiscountFactorReturnMapper",
-            config=MapperConfig(),
+            config=self.config,
             state={"intercept": self._intercept, "slope": self._slope},
             arrays={},
         )
@@ -124,11 +128,12 @@ class LinearStochasticDiscountFactorReturnMapper:
         return model
 
 
-class StochasticDiscountFactorBetaNetworkHead:
+class StochasticDiscountFactorBetaNetworkHead(FitObservable):
     """Paper-faithful beta-network predictive head for stochastic discount factor models."""
 
     def __init__(self, config: StochasticDiscountFactorConfig) -> None:
         self.config = config
+        self._last_fit_record = None
         self._checkpoint_states: dict[int, dict[str, Any]] = {}
         self._n_asset_features: int | None = None
         self._n_context_features: int = 0
@@ -144,6 +149,7 @@ class StochasticDiscountFactorBetaNetworkHead:
     def is_fitted(self) -> bool:
         return bool(self._checkpoint_states)
 
+    @observed_fit
     @atomic_fit(
         "_checkpoint_states",
         "_n_asset_features",

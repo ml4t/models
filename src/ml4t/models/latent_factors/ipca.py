@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
+from ml4t.models._internal.observability import observed_fit
 from ml4t.models._internal.persistence import (
     load_artifact,
     load_config,
@@ -46,6 +47,7 @@ class IPCAModel(BaseLatentFactorModel[IPCAConfig]):
             raise RuntimeError("IPCA model must be fitted before train_factor_returns is available")
         return self._train_factor_returns
 
+    @observed_fit
     def fit(self, batch: PanelBatch) -> FitSummary:
         cross_section = _require_cross_section(batch)
         if cross_section.returns is None:

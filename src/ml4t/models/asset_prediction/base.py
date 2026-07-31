@@ -4,16 +4,18 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
+from ml4t.models._internal.observability import FitObservable
 from ml4t.models.configs.asset_prediction import AssetPredictionConfig
 from ml4t.models.types import AssetSignalResult, CrossSectionBatch, FitSummary
 
 
-class BaseAssetPredictionModel[ConfigT: AssetPredictionConfig](ABC):
+class BaseAssetPredictionModel[ConfigT: AssetPredictionConfig](FitObservable, ABC):
     """Abstract base for direct asset-level predictive models."""
 
     def __init__(self, config: ConfigT) -> None:
         self.config = config
         self._is_fitted = False
+        self._last_fit_record = None
 
     @property
     def is_fitted(self) -> bool:

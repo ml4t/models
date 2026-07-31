@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.version]
-path = "src/ml4t/models/__init__.py"
+path = "src/ml4t/models/_version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ml4t"]
