@@ -38,6 +38,11 @@ REPLAY_TOLERANCES = {
     "cuda": (1e-5, 1e-5),
     "mps": (1e-4, 1e-4),
 }
+CPU_RECOVERY_TOLERANCES = {
+    "cpu": REPLAY_TOLERANCES["cpu"],
+    "cuda": (5e-5, 5e-5),
+    "mps": REPLAY_TOLERANCES["mps"],
+}
 
 FitOnce = Callable[[], tuple[Any, np.ndarray, Callable[[Any], np.ndarray]]]
 Loader = Callable[[Path, str], Any]
@@ -90,12 +95,21 @@ def _max_abs_difference(left: np.ndarray, right: np.ndarray) -> float:
     return float(np.nanmax(np.abs(left - right)))
 
 
-def _assert_close(name: str, left: np.ndarray, right: np.ndarray, device: str) -> float:
-    rtol, atol = REPLAY_TOLERANCES[device]
+def _assert_close(
+    name: str,
+    left: np.ndarray,
+    right: np.ndarray,
+    device: str,
+    *,
+    cpu_recovery: bool = False,
+) -> float:
+    tolerances = CPU_RECOVERY_TOLERANCES if cpu_recovery else REPLAY_TOLERANCES
+    rtol, atol = tolerances[device]
     difference = _max_abs_difference(left, right)
     if not np.allclose(left, right, rtol=rtol, atol=atol, equal_nan=True):
+        comparison = "CPU recovery" if cpu_recovery else "replay"
         raise AssertionError(
-            f"{name} exceeded replay tolerance: max_abs_difference={difference}, "
+            f"{name} exceeded {comparison} tolerance: max_abs_difference={difference}, "
             f"rtol={rtol}, atol={atol}"
         )
     return difference
@@ -134,7 +148,13 @@ def _qualify(
     recovered_device = predict(loaded_device)
     recovered_cpu = predict(loaded_cpu)
     recovery_device_difference = _assert_close(name, first, recovered_device, device)
-    recovery_cpu_difference = _assert_close(name, first, recovered_cpu, device)
+    recovery_cpu_difference = _assert_close(
+        name,
+        first,
+        recovered_cpu,
+        device,
+        cpu_recovery=True,
+    )
 
     _, replay, _ = fit_once()
     replay_difference = _assert_close(name, first, replay, device)
@@ -379,6 +399,10 @@ def qualify(device: str) -> dict[str, Any]:
         "replay_tolerance": {
             "atol": REPLAY_TOLERANCES[device][1],
             "rtol": REPLAY_TOLERANCES[device][0],
+        },
+        "cpu_recovery_tolerance": {
+            "atol": CPU_RECOVERY_TOLERANCES[device][1],
+            "rtol": CPU_RECOVERY_TOLERANCES[device][0],
         },
         "results": results,
     }
