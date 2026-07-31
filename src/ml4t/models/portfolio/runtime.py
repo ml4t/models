@@ -233,8 +233,6 @@ def costs_tensor(batch: PortfolioSequenceBatch, device: torch.device) -> torch.T
     if batch.costs is None:
         return None
     costs = np.asarray(batch.costs, dtype=np.float32)
-    if costs.ndim == 1:
-        costs = costs[:, None]
     return torch.as_tensor(costs, dtype=torch.float32, device=device)
 
 

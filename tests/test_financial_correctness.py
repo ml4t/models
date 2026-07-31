@@ -352,3 +352,148 @@ def test_portfolio_constraints_reject_infeasible_request() -> None:
             net_exposure=0.0,
             max_abs_weight=0.2,
         )
+
+
+def test_portfolio_runtime_tensor_helpers_preserve_optional_inputs() -> None:
+    device = torch.device("cpu")
+    populated = PortfolioSequenceBatch(
+        features=np.ones((1, 2, 2, 1)),
+        vol_scale=np.full((1, 2, 2), 2.0),
+        prev_weights=np.array([[0.1, -0.1]]),
+        mask=np.array([[[True, False], [True, True]]]),
+        group_ids=np.array([0, 1]),
+        costs=np.array([0.01, 0.02]),
+        adjacency_mask=np.array([[False, True], [True, False]]),
+    )
+    minimal = PortfolioSequenceBatch(features=np.ones((1, 2, 2, 1)))
+
+    torch.testing.assert_close(
+        portfolio_runtime.mask_tensor(populated, device),
+        torch.tensor([[[1.0, 0.0], [1.0, 1.0]]]),
+    )
+    torch.testing.assert_close(
+        portfolio_runtime.group_ids_tensor(populated, device), torch.tensor([0, 1])
+    )
+    torch.testing.assert_close(
+        portfolio_runtime.costs_tensor(populated, device), torch.tensor([[0.01], [0.02]])
+    )
+    torch.testing.assert_close(
+        portfolio_runtime.previous_weights_tensor(populated, device),
+        torch.tensor([[0.1, -0.1]]),
+    )
+    torch.testing.assert_close(
+        portfolio_runtime.adjacency_mask_tensor(populated, device),
+        torch.tensor([[False, True], [True, False]]),
+    )
+    np.testing.assert_array_equal(portfolio_runtime._vol_scale(populated), 2.0)
+
+    assert portfolio_runtime.group_ids_tensor(minimal, device) is None
+    assert portfolio_runtime.costs_tensor(minimal, device) is None
+    assert portfolio_runtime.previous_weights_tensor(minimal, device) is None
+    assert portfolio_runtime.adjacency_mask_tensor(minimal, device) is None
+    np.testing.assert_array_equal(portfolio_runtime._vol_scale(minimal), 1.0)
+
+
+def test_portfolio_training_rejects_nonfinite_gradient() -> None:
+    policy = _ScalarPolicy()
+    policy.scale.register_hook(lambda gradient: torch.full_like(gradient, float("nan")))
+    batch = _portfolio_training_batch()
+
+    with pytest.raises(FloatingPointError, match="non-finite training gradient at step 1"):
+        portfolio_runtime.fit_policy_network(
+            policy,
+            batch=batch,
+            validation_batch=batch,
+            config=PortfolioConfig(max_iters=1, eval_every=1, checkpoint_every=1),
+            device=torch.device("cpu"),
+        )
+
+
+def test_portfolio_training_rejects_nonfinite_gradient_norm(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        portfolio_runtime.torch.nn.utils,
+        "clip_grad_norm_",
+        lambda *_args, **_kwargs: torch.tensor(float("nan")),
+    )
+    batch = _portfolio_training_batch()
+
+    with pytest.raises(FloatingPointError, match="non-finite training gradient norm at step 1"):
+        portfolio_runtime.fit_policy_network(
+            _ScalarPolicy(),
+            batch=batch,
+            validation_batch=batch,
+            config=PortfolioConfig(max_iters=1, eval_every=1, checkpoint_every=1),
+            device=torch.device("cpu"),
+        )
+
+
+def test_portfolio_training_rejects_nonfinite_parameter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_step = portfolio_runtime.AdamW.step
+
+    def corrupt_step(optimizer: torch.optim.Optimizer, *args: object, **kwargs: object) -> object:
+        result = original_step(optimizer, *args, **kwargs)
+        for group in optimizer.param_groups:
+            for parameter in group["params"]:
+                parameter.data.fill_(float("nan"))
+        return result
+
+    monkeypatch.setattr(portfolio_runtime.AdamW, "step", corrupt_step)
+    batch = _portfolio_training_batch()
+
+    with pytest.raises(FloatingPointError, match="non-finite model parameter at step 1"):
+        portfolio_runtime.fit_policy_network(
+            _ScalarPolicy(),
+            batch=batch,
+            validation_batch=batch,
+            config=PortfolioConfig(max_iters=1, eval_every=1, checkpoint_every=1),
+            device=torch.device("cpu"),
+        )
+
+
+def test_portfolio_training_rejects_nonfinite_validation_metric(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        portfolio_runtime, "evaluate_pooled_sharpe", lambda *_args, **_kwargs: np.nan
+    )
+    batch = _portfolio_training_batch()
+
+    with pytest.raises(FloatingPointError, match="non-finite validation Sharpe at step 1"):
+        portfolio_runtime.fit_policy_network(
+            _ScalarPolicy(),
+            batch=batch,
+            validation_batch=batch,
+            config=PortfolioConfig(max_iters=1, eval_every=1, checkpoint_every=1),
+            device=torch.device("cpu"),
+        )
+
+
+def test_portfolio_training_stops_after_validation_patience(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    values = iter((1.0, 0.0, -1.0))
+    monkeypatch.setattr(
+        portfolio_runtime, "evaluate_pooled_sharpe", lambda *_args, **_kwargs: next(values)
+    )
+    batch = _portfolio_training_batch()
+
+    artifacts = portfolio_runtime.fit_policy_network(
+        _ScalarPolicy(),
+        batch=batch,
+        validation_batch=batch,
+        config=PortfolioConfig(
+            max_iters=3,
+            eval_every=1,
+            checkpoint_every=1,
+            early_stopping_burn_in_iters=1,
+            early_stopping_patience=1,
+            metric_ema_alpha=1.0,
+        ),
+        device=torch.device("cpu"),
+    )
+
+    assert len(artifacts.history) == 2
