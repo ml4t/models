@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import subprocess
+import tarfile
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -55,3 +57,17 @@ def test_rebuilt_wheel_matches_candidate(candidate_dir: Path, tmp_path: Path) ->
     subprocess.run(["uv", "build", "--wheel", "--out-dir", str(tmp_path)], check=True)
 
     candidate.compare_wheel(candidate_dir, tmp_path)
+
+
+def test_candidate_contains_typing_and_documentation_contracts(candidate_dir: Path) -> None:
+    wheel, sdist = candidate._distribution_files(candidate_dir)
+    with zipfile.ZipFile(wheel) as archive:
+        wheel_members = set(archive.namelist())
+    assert "ml4t/models/_version.py" in wheel_members
+    assert "ml4t/models/py.typed" in wheel_members
+
+    with tarfile.open(sdist, "r:gz") as archive:
+        sdist_members = {member.name.partition("/")[2] for member in archive.getmembers()}
+    assert "SECURITY.md" in sdist_members
+    assert "mkdocs.yml" in sdist_members
+    assert "docs/getting-started/installation.md" in sdist_members

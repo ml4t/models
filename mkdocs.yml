@@ -120,6 +120,8 @@ nav:
     - Academic References: reference/academic-references.md
 
 extra:
+  release_version: !ENV [ML4T_DOCS_VERSION, development]
+  release_commit: !ENV [ML4T_DOCS_COMMIT, local]
   ml4t_docs_hub_url: /docs/
   ml4t_libraries_url: /libraries/
   ml4t_chapters_url: /chapters/

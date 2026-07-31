@@ -67,10 +67,141 @@ jobs:
           path: candidate/
           if-no-files-found: error
 
+  docs:
+    name: Publish Qualified Documentation
+    runs-on: ubuntu-latest
+    needs: select-candidate
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        id: setup-python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Download selected candidate
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: qualified-release-candidate
+          path: candidate
+
+      - name: Resolve release identity
+        id: identity
+        run: |
+          version="$(python -c 'import json; print(json.load(open("candidate/candidate.json"))["version"])')"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Build revision-identified documentation
+        env:
+          ML4T_DOCS_VERSION: ${{ steps.identity.outputs.version }}
+          ML4T_DOCS_COMMIT: ${{ github.sha }}
+        run: |
+          uv sync --dev --extra docs --python "${{ steps.setup-python.outputs.python-path }}"
+          uv run mkdocs build --strict
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          Path("site/release.json").write_text(
+              json.dumps(
+                  {
+                      "commit": os.environ["ML4T_DOCS_COMMIT"],
+                      "version": os.environ["ML4T_DOCS_VERSION"],
+                  },
+                  sort_keys=True,
+              )
+              + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Require deploy credentials
+        env:
+          DOCS_DEPLOY_KEY: ${{ secrets.DOCS_DEPLOY_KEY }}
+        run: |
+          if [[ -z "$DOCS_DEPLOY_KEY" ]]; then
+            echo "DOCS_DEPLOY_KEY is required for a stable release" >&2
+            exit 1
+          fi
+
+      - name: Deploy stable documentation
+        uses: cpina/github-action-push-to-another-repository@55306faa4ed53b815ae49e564af8cfb359d32ae2 # v1.7.3
+        env:
+          SSH_DEPLOY_KEY: ${{ secrets.DOCS_DEPLOY_KEY }}
+        with:
+          source-directory: site/
+          destination-github-username: ml4t
+          destination-repository-name: website
+          target-directory: static/docs/models/
+          target-branch: main
+          commit-message: "docs(models): publish ${{ github.ref_name }} from ${{ github.sha }}"
+          user-name: ml4t-bot
+          user-email: bot@ml4trading.io
+
+      - name: Deploy versioned documentation
+        uses: cpina/github-action-push-to-another-repository@55306faa4ed53b815ae49e564af8cfb359d32ae2 # v1.7.3
+        env:
+          SSH_DEPLOY_KEY: ${{ secrets.DOCS_DEPLOY_KEY }}
+        with:
+          source-directory: site/
+          destination-github-username: ml4t
+          destination-repository-name: website
+          target-directory: static/docs/models/releases/${{ steps.identity.outputs.version }}/
+          target-branch: main
+          commit-message: "docs(models): retain ${{ github.ref_name }} from ${{ github.sha }}"
+          user-name: ml4t-bot
+          user-email: bot@ml4trading.io
+
+      - name: Verify deployed documentation identity
+        env:
+          RELEASE_VERSION: ${{ steps.identity.outputs.version }}
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import time
+          from urllib.error import URLError
+          from urllib.request import urlopen
+
+          expected = {
+              "commit": os.environ["RELEASE_COMMIT"],
+              "version": os.environ["RELEASE_VERSION"],
+          }
+          urls = (
+              "https://ml4trading.io/docs/models/release.json",
+              f"https://ml4trading.io/docs/models/releases/{expected['version']}/release.json",
+          )
+          for attempt in range(20):
+              try:
+                  observed = []
+                  for url in urls:
+                      with urlopen(f"{url}?commit={expected['commit']}", timeout=20) as response:
+                          observed.append(json.load(response))
+                  if all(value == expected for value in observed):
+                      break
+              except (OSError, URLError, ValueError):
+                  pass
+              if attempt == 19:
+                  raise RuntimeError(
+                      f"deployed documentation identity did not match {expected!r}"
+                  )
+              time.sleep(15)
+          PY
+
   publish:
     name: Publish to PyPI
     runs-on: ubuntu-latest
-    needs: select-candidate
+    needs: [select-candidate, docs]
     environment: pypi
     permissions:
       id-token: write

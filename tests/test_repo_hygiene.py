@@ -69,6 +69,9 @@ def test_ci_qualifies_one_candidate_across_required_platforms() -> None:
     assert "scripts/ci/test_wheel.py candidate" in workflow
     assert "scripts/ci/check_coverage.py coverage.json" in workflow
     assert "needs: [lint, typecheck, coverage, docs]" in workflow
+    assert "dependency-audit:" in workflow
+    assert "torch==2.13.0" in workflow
+    assert "needs: [stable-platform, python-prerelease, dependency-audit]" in workflow
 
 
 def test_release_promotes_qualified_candidate_without_rebuilding() -> None:
@@ -79,3 +82,16 @@ def test_release_promotes_qualified_candidate_without_rebuilding() -> None:
     assert "--workflow ci.yml" in workflow
     assert '--expected-tag "${{ github.ref_name }}"' in workflow
     assert "packages-dir: candidate/dist/" in workflow
+    assert "name: Publish Qualified Documentation" in workflow
+    assert "DOCS_DEPLOY_KEY is required for a stable release" in workflow
+    assert "https://ml4trading.io/docs/models/release.json" in workflow
+    assert "needs: [select-candidate, docs]" in workflow
+
+
+def test_security_policy_has_a_private_reporting_route_and_supported_versions() -> None:
+    root = Path(__file__).parents[1]
+    policy = (root / "SECURITY.md").read_text(encoding="utf-8")
+
+    assert "stefan@ml4trading.io" in policy
+    assert "Do not open a public issue" in policy
+    assert "Latest stable `0.1.x`" in policy
