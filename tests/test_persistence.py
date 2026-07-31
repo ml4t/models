@@ -10,7 +10,11 @@ import pytest
 
 from ml4t.models import (
     AR1FactorForecaster,
+    CAEConfig,
+    CAEModel,
     CrossSectionBatch,
+    DeepPortfolioConfig,
+    DeepPortfolioModel,
     EWMABaseFactorForecaster,
     ExpandingMeanFactorForecaster,
     IPCAConfig,
@@ -18,12 +22,20 @@ from ml4t.models import (
     LatentFactorState,
     LinearFeaturePortfolioModel,
     LinearPortfolioConfig,
+    LinearStochasticDiscountFactorReturnMapper,
+    LSTMPortfolioConfig,
+    LSTMPortfolioModel,
     PCAConfig,
     PCAModel,
     PersistentPanelBatch,
     PortfolioSequenceBatch,
     RPPCAConfig,
     RPPCAModel,
+    SAEConfig,
+    SAEModel,
+    StochasticDiscountFactorBetaNetworkHead,
+    StochasticDiscountFactorConfig,
+    StochasticDiscountFactorModel,
 )
 
 
@@ -136,3 +148,142 @@ def test_artifact_loader_rejects_the_wrong_model_type(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="model_type mismatch"):
         RPPCAModel.load(artifact)
+
+
+def test_cae_and_sae_artifacts_preserve_predictions(tmp_path: Path) -> None:
+    rng = np.random.default_rng(79)
+    batch = CrossSectionBatch(
+        characteristics=rng.normal(size=(5, 4, 3)),
+        returns=rng.normal(size=(5, 4)),
+        asset_ids=("A", "B", "C", "D"),
+    )
+    future = CrossSectionBatch(
+        characteristics=rng.normal(size=(2, 4, 3)),
+        asset_ids=batch.asset_ids,
+    )
+
+    cae = CAEModel(
+        CAEConfig(
+            n_factors=1,
+            hidden_units=(),
+            n_epochs=1,
+            checkpoint_interval=1,
+            batch_size=32,
+        )
+    )
+    cae.fit(batch)
+    expected_cae = cae.extract(future).asset_betas
+    recovered_cae = CAEModel.load(cae.save(tmp_path / "cae.ml4t"))
+    assert np.array_equal(recovered_cae.extract(future).asset_betas, expected_cae)
+
+    sae = SAEModel(
+        SAEConfig(
+            bottleneck_dim=2,
+            aux_hidden_dim=2,
+            main_hidden_units=(4, 4, 4, 4),
+            dropout_rates=(0.0,) * 8,
+            n_epochs=1,
+            checkpoint_interval=1,
+            batch_size=32,
+        )
+    )
+    sae.fit(batch)
+    expected_sae = sae.predict(future).signal_values
+    recovered_sae = SAEModel.load(sae.save(tmp_path / "sae.ml4t"))
+    assert np.array_equal(recovered_sae.predict(future).signal_values, expected_sae)
+
+
+@pytest.mark.parametrize(
+    "model",
+    [
+        LSTMPortfolioModel(
+            LSTMPortfolioConfig(
+                hidden_size=4,
+                max_iters=1,
+                eval_every=1,
+                checkpoint_every=1,
+            )
+        ),
+        DeepPortfolioModel(
+            DeepPortfolioConfig(
+                d_model=4,
+                n_heads=1,
+                cross_attention_heads=1,
+                macro_gnn_heads=1,
+                max_iters=1,
+                eval_every=1,
+                checkpoint_every=1,
+            )
+        ),
+    ],
+)
+def test_neural_portfolio_artifacts_preserve_predictions(
+    model: object,
+    tmp_path: Path,
+) -> None:
+    rng = np.random.default_rng(83)
+    train = PortfolioSequenceBatch(
+        features=rng.normal(size=(2, 3, 2, 2)),
+        returns=rng.normal(size=(2, 3, 2)),
+        asset_ids=("A", "B"),
+    )
+    future = PortfolioSequenceBatch(
+        features=rng.normal(size=(1, 2, 2, 2)),
+        asset_ids=train.asset_ids,
+    )
+    model.fit(train)
+    expected = model.predict(future).weights
+
+    recovered = type(model).load(model.save(tmp_path / "portfolio.ml4t"))
+
+    assert np.array_equal(recovered.predict(future).weights, expected)
+
+
+def test_sdf_model_and_heads_preserve_predictions(tmp_path: Path) -> None:
+    rng = np.random.default_rng(89)
+    batch = CrossSectionBatch(
+        characteristics=rng.normal(size=(5, 4, 3)),
+        returns=rng.normal(scale=0.02, size=(5, 4)),
+        asset_ids=("A", "B", "C", "D"),
+    )
+    config = StochasticDiscountFactorConfig(
+        state_dim_sdf=2,
+        state_dim_moment=2,
+        hidden_dim=4,
+        n_instruments=2,
+        n_epochs_unc=1,
+        n_epochs_moment=1,
+        n_epochs_cond=1,
+        checkpoint_interval=1,
+        beta_state_dim=2,
+        beta_hidden_dim=4,
+        beta_n_epochs=1,
+        beta_checkpoint_interval=1,
+        dropout=0.0,
+    )
+    sdf = StochasticDiscountFactorModel(config)
+    sdf.fit(batch)
+    expected_state = sdf.extract(batch, checkpoint=("conditional", 1))
+    recovered_sdf = StochasticDiscountFactorModel.load(sdf.save(tmp_path / "sdf.ml4t"))
+    recovered_state = recovered_sdf.extract(batch, checkpoint=("conditional", 1))
+    assert np.array_equal(recovered_state.asset_weights, expected_state.asset_weights)
+
+    mapper = LinearStochasticDiscountFactorReturnMapper()
+    mapper.fit(expected_state, batch)
+    expected_forecast = mapper.predict(expected_state).expected_returns
+    recovered_mapper = LinearStochasticDiscountFactorReturnMapper.load(
+        mapper.save(tmp_path / "mapper.ml4t")
+    )
+    assert np.array_equal(
+        recovered_mapper.predict(expected_state).expected_returns, expected_forecast
+    )
+
+    head = StochasticDiscountFactorBetaNetworkHead(config)
+    head.fit(expected_state, batch)
+    expected_signal = head.predict(batch, checkpoint=1).signal_values
+    recovered_head = StochasticDiscountFactorBetaNetworkHead.load(
+        head.save(tmp_path / "beta-head.ml4t")
+    )
+    assert np.array_equal(
+        recovered_head.predict(batch, checkpoint=1).signal_values, expected_signal
+    )

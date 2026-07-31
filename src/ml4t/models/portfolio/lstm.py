@@ -3,12 +3,21 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from pathlib import Path
+from typing import cast
 
 import numpy as np
 import torch
 from torch import nn
 
 from ml4t.models._internal.latent_factor_utils import select_checkpoint_epoch
+from ml4t.models._internal.persistence import (
+    load_artifact,
+    load_config,
+    pack_tensor_tree,
+    save_artifact,
+    unpack_tensor_tree,
+)
 from ml4t.models._internal.torch_runtime import resolve_device, seed_torch
 from ml4t.models.configs import LSTMPortfolioConfig
 from ml4t.models.portfolio.base import BasePortfolioModel
@@ -121,7 +130,6 @@ class LSTMPortfolioModel(BasePortfolioModel):
     def __init__(self, config: LSTMPortfolioConfig) -> None:
         super().__init__(config)
         self.config: LSTMPortfolioConfig = config
-        self._model: LSTMPortfolioPolicy | None = None
         self._asset_ids: tuple[str, ...] = ()
         self._n_assets: int | None = None
         self._n_features: int | None = None
@@ -167,7 +175,6 @@ class LSTMPortfolioModel(BasePortfolioModel):
             device=device,
         )
 
-        self._model = model
         self._asset_ids = batch.asset_ids
         self._n_assets = batch.n_assets
         self._n_features = batch.features.shape[3]
@@ -192,12 +199,7 @@ class LSTMPortfolioModel(BasePortfolioModel):
         checkpoint: int | None = None,
     ) -> PortfolioWeightsResult:
         validate_portfolio_prediction_batch(batch, self.config)
-        if (
-            not self.is_fitted
-            or self._model is None
-            or self._n_assets is None
-            or self._n_features is None
-        ):
+        if not self.is_fitted or self._n_assets is None or self._n_features is None:
             raise RuntimeError("LSTMPortfolioModel must be fitted before predict()")
         if batch.n_assets != self._n_assets or batch.features.shape[3] != self._n_features:
             raise ValueError("prediction batch shape does not match the fitted model")
@@ -244,3 +246,56 @@ class LSTMPortfolioModel(BasePortfolioModel):
         if not self.config.use_group_embedding or batch.group_ids is None:
             return None
         return int(np.max(np.asarray(batch.group_ids, dtype=np.int64))) + 1
+
+    def save(self, path: str | Path) -> Path:
+        if (
+            not self.is_fitted
+            or self._n_assets is None
+            or self._n_features is None
+            or not self._checkpoint_states
+        ):
+            raise RuntimeError("LSTMPortfolioModel must be fitted before save()")
+        checkpoint_tree, arrays = pack_tensor_tree(self._checkpoint_states)
+        return save_artifact(
+            path,
+            model_type="ml4t.models.LSTMPortfolioModel",
+            config=self.config,
+            state={
+                "asset_ids": self._asset_ids,
+                "n_assets": self._n_assets,
+                "n_features": self._n_features,
+                "n_groups": self._n_groups,
+                "history": self._history,
+                "checkpoint_tree": checkpoint_tree,
+            },
+            arrays=arrays,
+        )
+
+    @classmethod
+    def load(
+        cls,
+        path: str | Path,
+        *,
+        device: str | None = None,
+    ) -> LSTMPortfolioModel:
+        artifact = load_artifact(path, expected_model_type="ml4t.models.LSTMPortfolioModel")
+        model = cls(load_config(artifact, LSTMPortfolioConfig, device=device))
+        checkpoint_tree = artifact.state.get("checkpoint_tree")
+        if not isinstance(checkpoint_tree, dict):
+            raise ValueError("artifact LSTM portfolio checkpoint tree is invalid")
+        model._checkpoint_states = cast(
+            dict[int, dict[str, torch.Tensor]],
+            unpack_tensor_tree(checkpoint_tree, artifact.arrays, torch=torch),
+        )
+        model._asset_ids = tuple(artifact.state.get("asset_ids", ()))
+        model._n_assets = int(artifact.state["n_assets"])
+        model._n_features = int(artifact.state["n_features"])
+        raw_n_groups = artifact.state.get("n_groups")
+        model._n_groups = None if raw_n_groups is None else int(raw_n_groups)
+        model._history = tuple(artifact.state.get("history", ()))
+        if not model._checkpoint_states:
+            raise ValueError("artifact LSTM portfolio has no checkpoints")
+        if model._asset_ids and len(model._asset_ids) != model._n_assets:
+            raise ValueError("artifact LSTM portfolio asset identity disagrees with dimensions")
+        model._mark_fitted()
+        return model

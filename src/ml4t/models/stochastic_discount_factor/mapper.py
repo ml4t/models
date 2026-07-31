@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Any
+from pathlib import Path
+from typing import Any, cast
 
 import numpy as np
 
@@ -11,8 +12,16 @@ from ml4t.models._internal.latent_factor_utils import (
     resolve_checkpoint_epochs,
     select_checkpoint_epoch,
 )
+from ml4t.models._internal.persistence import (
+    load_artifact,
+    load_config,
+    pack_tensor_tree,
+    require_array_names,
+    save_artifact,
+    unpack_tensor_tree,
+)
 from ml4t.models._internal.torch_runtime import import_torch, resolve_device, seed_torch
-from ml4t.models.configs import StochasticDiscountFactorConfig
+from ml4t.models.configs import MapperConfig, StochasticDiscountFactorConfig
 from ml4t.models.types import (
     AssetForecastResult,
     AssetSignalResult,
@@ -80,6 +89,32 @@ class LinearStochasticDiscountFactorReturnMapper:
             asset_ids=state.asset_ids,
             metadata={"mapper": "linear_stochastic_discount_factor_return"},
         )
+
+    def save(self, path: str | Path) -> Path:
+        if not self._is_fitted:
+            raise RuntimeError(
+                "LinearStochasticDiscountFactorReturnMapper must be fitted before save()"
+            )
+        return save_artifact(
+            path,
+            model_type="ml4t.models.LinearStochasticDiscountFactorReturnMapper",
+            config=MapperConfig(),
+            state={"intercept": self._intercept, "slope": self._slope},
+            arrays={},
+        )
+
+    @classmethod
+    def load(cls, path: str | Path) -> LinearStochasticDiscountFactorReturnMapper:
+        artifact = load_artifact(
+            path,
+            expected_model_type="ml4t.models.LinearStochasticDiscountFactorReturnMapper",
+        )
+        require_array_names(artifact, set())
+        model = cls()
+        model._intercept = float(artifact.state["intercept"])
+        model._slope = float(artifact.state["slope"])
+        model._is_fitted = True
+        return model
 
 
 class StochasticDiscountFactorBetaNetworkHead:
@@ -285,6 +320,56 @@ class StochasticDiscountFactorBetaNetworkHead:
                 "f_hat_scale": self._f_hat_scale,
             },
         )
+
+    def save(self, path: str | Path) -> Path:
+        if not self.is_fitted or self._n_asset_features is None:
+            raise RuntimeError(
+                "StochasticDiscountFactorBetaNetworkHead must be fitted before save()"
+            )
+        checkpoint_tree, arrays = pack_tensor_tree(self._checkpoint_states)
+        return save_artifact(
+            path,
+            model_type="ml4t.models.StochasticDiscountFactorBetaNetworkHead",
+            config=self.config,
+            state={
+                "asset_ids": self._asset_ids,
+                "n_asset_features": self._n_asset_features,
+                "n_context_features": self._n_context_features,
+                "f_hat_scale": self._f_hat_scale,
+                "history": self._history,
+                "checkpoint_tree": checkpoint_tree,
+            },
+            arrays=arrays,
+        )
+
+    @classmethod
+    def load(
+        cls,
+        path: str | Path,
+        *,
+        device: str | None = None,
+    ) -> StochasticDiscountFactorBetaNetworkHead:
+        artifact = load_artifact(
+            path,
+            expected_model_type="ml4t.models.StochasticDiscountFactorBetaNetworkHead",
+        )
+        model = cls(load_config(artifact, StochasticDiscountFactorConfig, device=device))
+        checkpoint_tree = artifact.state.get("checkpoint_tree")
+        if not isinstance(checkpoint_tree, dict):
+            raise ValueError("artifact SDF beta-network checkpoint tree is invalid")
+        torch = import_torch()
+        model._checkpoint_states = cast(
+            dict[int, dict[str, Any]],
+            unpack_tensor_tree(checkpoint_tree, artifact.arrays, torch=torch),
+        )
+        model._asset_ids = tuple(artifact.state.get("asset_ids", ()))
+        model._n_asset_features = int(artifact.state["n_asset_features"])
+        model._n_context_features = int(artifact.state["n_context_features"])
+        model._f_hat_scale = float(artifact.state["f_hat_scale"])
+        model._history = tuple(artifact.state.get("history", ()))
+        if not model._checkpoint_states:
+            raise ValueError("artifact SDF beta-network has no checkpoints")
+        return model
 
 
 def _beta_training_payload(

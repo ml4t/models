@@ -4,11 +4,19 @@ from __future__ import annotations
 
 from collections import defaultdict
 from copy import deepcopy
-from typing import Any
+from pathlib import Path
+from typing import Any, cast
 
 import numpy as np
 
 from ml4t.models._internal.latent_factor_utils import select_checkpoint_epoch
+from ml4t.models._internal.persistence import (
+    load_artifact,
+    load_config,
+    pack_tensor_tree,
+    save_artifact,
+    unpack_tensor_tree,
+)
 from ml4t.models._internal.torch_runtime import import_torch, resolve_device, seed_torch
 from ml4t.models.api import PanelBatch
 from ml4t.models.configs import CAEConfig
@@ -384,6 +392,57 @@ class CAEModel(BaseLatentFactorModel[CAEConfig]):
                 )
             )
         return states
+
+    def save(self, path: str | Path) -> Path:
+        if (
+            not self.is_fitted
+            or self._n_characteristics is None
+            or self._n_instruments is None
+            or not self._checkpoint_states
+        ):
+            raise RuntimeError("CAE model must be fitted before save()")
+        checkpoint_tree, arrays = pack_tensor_tree(self._checkpoint_states)
+        return save_artifact(
+            path,
+            model_type="ml4t.models.CAEModel",
+            config=self.config,
+            state={
+                "asset_ids": self._asset_ids,
+                "n_characteristics": self._n_characteristics,
+                "n_instruments": self._n_instruments,
+                "history": self._history,
+                "fit_default_checkpoint": self._fit_default_checkpoint,
+                "checkpoint_tree": checkpoint_tree,
+            },
+            arrays=arrays,
+        )
+
+    @classmethod
+    def load(cls, path: str | Path, *, device: str | None = None) -> CAEModel:
+        artifact = load_artifact(path, expected_model_type="ml4t.models.CAEModel")
+        model = cls(load_config(artifact, CAEConfig, device=device))
+        checkpoint_tree = artifact.state.get("checkpoint_tree")
+        if not isinstance(checkpoint_tree, dict):
+            raise ValueError("artifact CAE checkpoint tree is invalid")
+        torch = import_torch()
+        model._checkpoint_states = cast(
+            dict[int, list[dict[str, Any]]],
+            unpack_tensor_tree(checkpoint_tree, artifact.arrays, torch=torch),
+        )
+        model._asset_ids = tuple(artifact.state.get("asset_ids", ()))
+        model._n_characteristics = int(artifact.state["n_characteristics"])
+        model._n_instruments = int(artifact.state["n_instruments"])
+        model._history = tuple(artifact.state.get("history", ()))
+        raw_default = artifact.state.get("fit_default_checkpoint")
+        model._fit_default_checkpoint = None if raw_default is None else int(raw_default)
+        if not model._checkpoint_states:
+            raise ValueError("artifact CAE has no checkpoints")
+        if any(
+            len(states) != model.config.n_ensemble for states in model._checkpoint_states.values()
+        ):
+            raise ValueError("artifact CAE ensemble size disagrees with config")
+        model._mark_fitted()
+        return model
 
 
 def _require_cross_section(batch: PanelBatch) -> CrossSectionBatch:

@@ -3,12 +3,21 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from pathlib import Path
+from typing import cast
 
 import numpy as np
 import torch
 from torch import nn
 
 from ml4t.models._internal.latent_factor_utils import select_checkpoint_epoch
+from ml4t.models._internal.persistence import (
+    load_artifact,
+    load_config,
+    pack_tensor_tree,
+    save_artifact,
+    unpack_tensor_tree,
+)
 from ml4t.models._internal.torch_runtime import resolve_device, seed_torch
 from ml4t.models.configs import DeepPortfolioConfig
 from ml4t.models.portfolio.base import BasePortfolioModel
@@ -163,7 +172,6 @@ class DeepPortfolioModel(BasePortfolioModel):
     def __init__(self, config: DeepPortfolioConfig) -> None:
         super().__init__(config)
         self.config: DeepPortfolioConfig = config
-        self._model: DeepPortfolioPolicy | None = None
         self._asset_ids: tuple[str, ...] = ()
         self._n_assets: int | None = None
         self._n_features: int | None = None
@@ -213,7 +221,6 @@ class DeepPortfolioModel(BasePortfolioModel):
             device=device,
         )
 
-        self._model = model
         self._asset_ids = batch.asset_ids
         self._n_assets = batch.n_assets
         self._n_features = batch.features.shape[3]
@@ -243,12 +250,7 @@ class DeepPortfolioModel(BasePortfolioModel):
         checkpoint: int | None = None,
     ) -> PortfolioWeightsResult:
         validate_portfolio_prediction_batch(batch, self.config)
-        if (
-            not self.is_fitted
-            or self._model is None
-            or self._n_assets is None
-            or self._n_features is None
-        ):
+        if not self.is_fitted or self._n_assets is None or self._n_features is None:
             raise RuntimeError("DeepPortfolioModel must be fitted before predict()")
         if batch.n_assets != self._n_assets or batch.features.shape[3] != self._n_features:
             raise ValueError("prediction batch shape does not match the fitted model")
@@ -310,6 +312,88 @@ class DeepPortfolioModel(BasePortfolioModel):
         if self._adjacency_mask is None:
             return None
         return torch.as_tensor(self._adjacency_mask, dtype=torch.bool, device=device)
+
+    def save(self, path: str | Path) -> Path:
+        if (
+            not self.is_fitted
+            or self._n_assets is None
+            or self._n_features is None
+            or not self._checkpoint_states
+        ):
+            raise RuntimeError("DeepPortfolioModel must be fitted before save()")
+        checkpoint_tree, arrays = pack_tensor_tree(self._checkpoint_states)
+        if self._adjacency_mask is not None:
+            arrays["adjacency_mask"] = self._adjacency_mask
+        return save_artifact(
+            path,
+            model_type="ml4t.models.DeepPortfolioModel",
+            config=self.config,
+            state={
+                "asset_ids": self._asset_ids,
+                "n_assets": self._n_assets,
+                "n_features": self._n_features,
+                "n_groups": self._n_groups,
+                "history": self._history,
+                "has_adjacency_mask": self._adjacency_mask is not None,
+                "checkpoint_tree": checkpoint_tree,
+            },
+            arrays=arrays,
+        )
+
+    @classmethod
+    def load(
+        cls,
+        path: str | Path,
+        *,
+        device: str | None = None,
+    ) -> DeepPortfolioModel:
+        artifact = load_artifact(path, expected_model_type="ml4t.models.DeepPortfolioModel")
+        model = cls(load_config(artifact, DeepPortfolioConfig, device=device))
+        checkpoint_tree = artifact.state.get("checkpoint_tree")
+        if not isinstance(checkpoint_tree, dict):
+            raise ValueError("artifact DeepPortfolio checkpoint tree is invalid")
+        tensor_arrays = {
+            name: array for name, array in artifact.arrays.items() if name.startswith("tensor_")
+        }
+        model._checkpoint_states = cast(
+            dict[int, dict[str, torch.Tensor]],
+            unpack_tensor_tree(checkpoint_tree, tensor_arrays, torch=torch),
+        )
+        has_adjacency_mask = artifact.state.get("has_adjacency_mask")
+        if not isinstance(has_adjacency_mask, bool):
+            raise ValueError("artifact DeepPortfolio adjacency state is invalid")
+        if has_adjacency_mask:
+            try:
+                adjacency_mask = artifact.arrays["adjacency_mask"]
+            except KeyError as exc:
+                raise ValueError("artifact DeepPortfolio is missing adjacency_mask") from exc
+            if adjacency_mask.ndim != 2:
+                raise ValueError("artifact DeepPortfolio adjacency_mask must be 2D")
+            model._adjacency_mask = np.asarray(adjacency_mask, dtype=bool).copy()
+        elif "adjacency_mask" in artifact.arrays:
+            raise ValueError("artifact DeepPortfolio has an unexpected adjacency_mask")
+        expected_arrays = set(tensor_arrays)
+        if has_adjacency_mask:
+            expected_arrays.add("adjacency_mask")
+        if set(artifact.arrays) != expected_arrays:
+            raise ValueError("artifact DeepPortfolio contains unexpected arrays")
+        model._asset_ids = tuple(artifact.state.get("asset_ids", ()))
+        model._n_assets = int(artifact.state["n_assets"])
+        model._n_features = int(artifact.state["n_features"])
+        raw_n_groups = artifact.state.get("n_groups")
+        model._n_groups = None if raw_n_groups is None else int(raw_n_groups)
+        model._history = tuple(artifact.state.get("history", ()))
+        if not model._checkpoint_states:
+            raise ValueError("artifact DeepPortfolio has no checkpoints")
+        if model._asset_ids and len(model._asset_ids) != model._n_assets:
+            raise ValueError("artifact DeepPortfolio asset identity disagrees with dimensions")
+        if model._adjacency_mask is not None and model._adjacency_mask.shape != (
+            model._n_assets,
+            model._n_assets,
+        ):
+            raise ValueError("artifact DeepPortfolio adjacency dimensions disagree")
+        model._mark_fitted()
+        return model
 
 
 def _same_optional_array(left: object | None, right: object | None) -> bool:

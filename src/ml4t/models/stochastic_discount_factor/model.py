@@ -4,12 +4,20 @@ from __future__ import annotations
 
 from collections import defaultdict
 from copy import deepcopy
-from typing import Any
+from pathlib import Path
+from typing import Any, cast
 
 import numpy as np
 
 from ml4t.models._internal.latent_factor_utils import (
     resolve_checkpoint_epochs,
+)
+from ml4t.models._internal.persistence import (
+    load_artifact,
+    load_config,
+    pack_tensor_tree,
+    save_artifact,
+    unpack_tensor_tree,
 )
 from ml4t.models._internal.torch_runtime import import_torch, resolve_device, seed_torch
 from ml4t.models.configs import StochasticDiscountFactorConfig
@@ -410,6 +418,53 @@ class StochasticDiscountFactorModel(BaseStochasticDiscountFactorModel):
         self._checkpoint_states[(phase, phase_epoch)] = _capture_state(
             stochastic_discount_factor_net, moment_net
         )
+
+    def save(self, path: str | Path) -> Path:
+        if not self.is_fitted or self._n_characteristics is None or not self._checkpoint_states:
+            raise RuntimeError("StochasticDiscountFactorModel must be fitted before save()")
+        checkpoint_tree, arrays = pack_tensor_tree(self._checkpoint_states)
+        return save_artifact(
+            path,
+            model_type="ml4t.models.StochasticDiscountFactorModel",
+            config=self.config,
+            state={
+                "asset_ids": self._asset_ids,
+                "n_characteristics": self._n_characteristics,
+                "n_context_features": self._n_context_features,
+                "history": self._history,
+                "checkpoint_tree": checkpoint_tree,
+            },
+            arrays=arrays,
+        )
+
+    @classmethod
+    def load(
+        cls,
+        path: str | Path,
+        *,
+        device: str | None = None,
+    ) -> StochasticDiscountFactorModel:
+        artifact = load_artifact(
+            path,
+            expected_model_type="ml4t.models.StochasticDiscountFactorModel",
+        )
+        model = cls(load_config(artifact, StochasticDiscountFactorConfig, device=device))
+        checkpoint_tree = artifact.state.get("checkpoint_tree")
+        if not isinstance(checkpoint_tree, dict):
+            raise ValueError("artifact stochastic discount factor checkpoint tree is invalid")
+        torch = import_torch()
+        model._checkpoint_states = cast(
+            dict[SDFCheckpoint, dict[str, dict[str, Any]]],
+            unpack_tensor_tree(checkpoint_tree, artifact.arrays, torch=torch),
+        )
+        model._asset_ids = tuple(artifact.state.get("asset_ids", ()))
+        model._n_characteristics = int(artifact.state["n_characteristics"])
+        model._n_context_features = int(artifact.state["n_context_features"])
+        model._history = tuple(artifact.state.get("history", ()))
+        if not model._checkpoint_states:
+            raise ValueError("artifact stochastic discount factor has no checkpoints")
+        model._mark_fitted()
+        return model
 
 
 def _resolve_mask(batch: CrossSectionBatch, torch: Any, device: Any) -> Any:
