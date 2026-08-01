@@ -63,7 +63,22 @@ def test_candidate_verification_rejects_modified_artifact(candidate_dir: Path) -
 def test_rebuilt_wheel_matches_candidate(candidate_dir: Path, tmp_path: Path) -> None:
     subprocess.run(["uv", "build", "--wheel", "--out-dir", str(tmp_path)], check=True)
 
+    candidate.compare_wheel(candidate_dir, tmp_path, require_byte_identical=True)
+
+
+def test_rebuilt_wheel_allows_platform_zip_metadata_only(
+    candidate_dir: Path,
+    tmp_path: Path,
+) -> None:
+    wheel = next((candidate_dir / "dist").glob("*.whl"))
+    rebuilt = tmp_path / wheel.name
+    with zipfile.ZipFile(wheel) as source, zipfile.ZipFile(rebuilt, "w") as destination:
+        for name in source.namelist():
+            destination.writestr(name, source.read(name))
+
     candidate.compare_wheel(candidate_dir, tmp_path)
+    with pytest.raises(ValueError, match="not byte-identical"):
+        candidate.compare_wheel(candidate_dir, tmp_path, require_byte_identical=True)
 
 
 def test_candidate_contains_typing_and_documentation_contracts(candidate_dir: Path) -> None:
