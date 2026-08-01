@@ -14,6 +14,7 @@ from scripts.ci import (
     check_performance,
     hardware_qualification,
     performance_qualification,
+    test_wheel,
 )
 
 
@@ -156,6 +157,41 @@ def test_performance_profiles_cover_representative_public_model_families() -> No
         for probe in performance_qualification.SCALING
         if probe.startswith(("cae_", "sdf_", "sae_", "lstm_", "deep_"))
     } >= {"assets", "periods", "epochs", "ensemble", "sequence", "iterations"}
+
+
+def test_performance_memory_measurement_is_importable_on_windows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(performance_qualification.sys, "platform", "win32")
+
+    assert performance_qualification._peak_rss_kib() is None
+
+
+def test_installed_typecheck_targets_candidate_environment(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    python = tmp_path / "candidate-python"
+    consumer = tmp_path / "typed_consumer.py"
+    observed: list[str] = []
+
+    def run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        observed.extend(command)
+        return subprocess.CompletedProcess(command, 1, stdout="invalid-assignment", stderr="")
+
+    monkeypatch.setattr(test_wheel.subprocess, "run", run)
+
+    test_wheel._check_consumer_types(python, consumer, tmp_path)
+
+    assert observed == [
+        str(python),
+        "-m",
+        "ty",
+        "check",
+        "--python",
+        str(python),
+        str(consumer),
+    ]
 
 
 def test_hardware_qualification_separates_replay_and_cpu_recovery_tolerances() -> None:
