@@ -106,7 +106,11 @@ print(prediction.asset_forecast.expected_returns.shape)
 ```python
 import numpy as np
 
-from ml4t.models import CrossSectionBatch, StochasticDiscountFactorConfig, StochasticDiscountFactorModel
+from ml4t.models import (
+    CrossSectionBatch,
+    StochasticDiscountFactorConfig,
+    StochasticDiscountFactorModel,
+)
 
 batch = CrossSectionBatch(
     characteristics=np.random.randn(36, 300, 16),

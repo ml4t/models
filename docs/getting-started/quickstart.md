@@ -45,7 +45,7 @@ fit_result = pipeline.fit(batch)
 lf_prediction = pipeline.predict(batch)
 
 print(fit_result.structural_fit.converged)
-print(lf_prediction.state.asset_betas.shape)              # (36, 250, 3)
+print(lf_prediction.state.asset_betas.shape)  # (36, 250, 3)
 print(lf_prediction.factor_forecast.factor_premia.shape)  # (36, 3)
 print(lf_prediction.asset_forecast.expected_returns.shape)
 ```
@@ -67,7 +67,11 @@ The stochastic discount factor family is different. It does not expose a `beta Ã
 ```python
 import numpy as np
 
-from ml4t.models import CrossSectionBatch, StochasticDiscountFactorConfig, StochasticDiscountFactorModel
+from ml4t.models import (
+    CrossSectionBatch,
+    StochasticDiscountFactorConfig,
+    StochasticDiscountFactorModel,
+)
 
 batch = CrossSectionBatch(
     characteristics=np.random.randn(48, 300, 16),
@@ -85,8 +89,8 @@ fit_summary = model.fit(batch)
 state = model.extract(batch)
 
 print(fit_summary.best_epoch)
-print(state.asset_weights.shape)   # (48, 300)
-print(state.sdf_values.shape)      # (48,)
+print(state.asset_weights.shape)  # (48, 300)
+print(state.sdf_values.shape)  # (48,)
 ```
 
 Use this family when you want:
