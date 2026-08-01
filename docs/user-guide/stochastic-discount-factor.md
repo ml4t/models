@@ -106,7 +106,11 @@ target.
 ## Typical Workflow
 
 ```python
-from ml4t.models import CrossSectionBatch, StochasticDiscountFactorConfig, StochasticDiscountFactorModel
+from ml4t.models import (
+    CrossSectionBatch,
+    StochasticDiscountFactorConfig,
+    StochasticDiscountFactorModel,
+)
 
 model = StochasticDiscountFactorModel(
     StochasticDiscountFactorConfig(

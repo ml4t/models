@@ -7,7 +7,7 @@ from dataclasses import asdict, fields, is_dataclass, replace
 from functools import wraps
 from hashlib import sha256
 from time import perf_counter
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
@@ -123,7 +123,7 @@ def _input_dimensions(inputs: tuple[Any, ...]) -> dict[str, int]:
             item = getattr(value, field.name)
             if isinstance(item, np.ndarray):
                 for axis, size in enumerate(item.shape):
-                    dimensions[f"{prefix}_{field.name}_{axis}"] = int(size)
+                    dimensions[f"{prefix}_{field.name}_{axis}"] = cast(int, size)
     return dimensions
 
 
@@ -153,7 +153,7 @@ def _update_array_digest(digest: Any, array: np.ndarray) -> None:
     iterator = np.nditer(
         array,
         flags=["external_loop", "buffered", "zerosize_ok"],
-        op_flags=[["readonly"]],
+        op_flags=["readonly"],
         order="C",
         buffersize=131_072,
     )
