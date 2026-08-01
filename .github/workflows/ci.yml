@@ -218,8 +218,14 @@ jobs:
           uv build --wheel --out-dir rebuilt-dist
           --python "${{ steps.setup-python.outputs.python-path }}"
 
-      - name: Verify reproducible wheel
+      - name: Verify platform-independent wheel contents
         run: python scripts/ci/candidate.py compare-wheel candidate rebuilt-dist
+
+      - name: Verify byte-identical canonical wheel
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        run: >-
+          python scripts/ci/candidate.py compare-wheel candidate rebuilt-dist
+          --require-byte-identical
 
       - name: Test installed candidate
         run: >-

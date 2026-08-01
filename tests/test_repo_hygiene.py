@@ -67,6 +67,9 @@ def test_ci_qualifies_one_candidate_across_required_platforms() -> None:
     assert "allow-prereleases: true" in workflow
     assert "name: release-candidate" in workflow
     assert "scripts/ci/test_wheel.py candidate" in workflow
+    assert "Verify platform-independent wheel contents" in workflow
+    assert "Verify byte-identical canonical wheel" in workflow
+    assert "--require-byte-identical" in workflow
     assert "scripts/ci/check_coverage.py coverage.json" in workflow
     assert "needs: [lint, typecheck, coverage, docs]" in workflow
     assert "dependency-audit:" in workflow

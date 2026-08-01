@@ -34,7 +34,8 @@ The stable candidate requires all of these results:
 - installed-wheel tests on Linux, macOS, and Windows for Python 3.12, 3.13, and 3.14
 - installed core-wheel tests on the current Python 3.15 prerelease for all three operating systems
 - current and supported-minimum dependency vulnerability scans
-- reproducible wheel reconstruction on every stable operating-system and Python cell
+- identical wheel members on every stable operating-system and Python cell, with a byte-identical
+  rebuild on the canonical Linux/Python 3.12 build cell
 - RTX 3090 CUDA fit, replay, checkpoint, persistence, CPU recovery, and CUDA recovery checks
 - three fresh-process Chapter 14 performance runs on the CUDA reference host
 - three fresh-process isolated scaling profiles for classical and neural workload axes

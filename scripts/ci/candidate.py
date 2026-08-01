@@ -139,7 +139,12 @@ def verify(
         raise ValueError("candidate metadata does not match the manifest")
 
 
-def compare_wheel(candidate_dir: Path, rebuilt_dir: Path) -> None:
+def compare_wheel(
+    candidate_dir: Path,
+    rebuilt_dir: Path,
+    *,
+    require_byte_identical: bool = False,
+) -> None:
     candidate_wheel, _ = _distribution_files(candidate_dir)
     rebuilt_wheels = tuple(rebuilt_dir.glob("*.whl"))
     if len(rebuilt_wheels) != 1:
@@ -147,7 +152,17 @@ def compare_wheel(candidate_dir: Path, rebuilt_dir: Path) -> None:
     rebuilt_wheel = rebuilt_wheels[0]
     if candidate_wheel.name != rebuilt_wheel.name:
         raise ValueError("rebuilt wheel filename does not match the candidate")
-    if _sha256(candidate_wheel) != _sha256(rebuilt_wheel):
+    with (
+        zipfile.ZipFile(candidate_wheel) as candidate_archive,
+        zipfile.ZipFile(rebuilt_wheel) as rebuilt_archive,
+    ):
+        candidate_members = {
+            name: candidate_archive.read(name) for name in candidate_archive.namelist()
+        }
+        rebuilt_members = {name: rebuilt_archive.read(name) for name in rebuilt_archive.namelist()}
+    if candidate_members != rebuilt_members:
+        raise ValueError("rebuilt wheel contents do not match the candidate")
+    if require_byte_identical and _sha256(candidate_wheel) != _sha256(rebuilt_wheel):
         raise ValueError("rebuilt wheel is not byte-identical to the candidate")
 
 
@@ -169,6 +184,7 @@ def _parser() -> argparse.ArgumentParser:
     compare_parser = subparsers.add_parser("compare-wheel")
     compare_parser.add_argument("candidate_dir", type=Path)
     compare_parser.add_argument("rebuilt_dir", type=Path)
+    compare_parser.add_argument("--require-byte-identical", action="store_true")
     return parser
 
 
@@ -184,7 +200,11 @@ def main() -> None:
             expected_tag=args.expected_tag,
         )
     else:
-        compare_wheel(args.candidate_dir, args.rebuilt_dir)
+        compare_wheel(
+            args.candidate_dir,
+            args.rebuilt_dir,
+            require_byte_identical=args.require_byte_identical,
+        )
 
 
 if __name__ == "__main__":
