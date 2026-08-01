@@ -71,7 +71,7 @@ def save_artifact(
         with ZipFile(temporary_path, mode="w", compression=ZIP_DEFLATED) as archive:
             archive.writestr(_MANIFEST_NAME, manifest_payload)
             archive.writestr(_ARRAYS_NAME, array_payload)
-        with temporary_path.open("rb") as artifact_file:
+        with temporary_path.open("rb+") as artifact_file:
             os.fsync(artifact_file.fileno())
         os.replace(temporary_path, output_path)
         _fsync_directory(output_path.parent)
@@ -307,6 +307,8 @@ def _decode_json(value: Any) -> Any:
 
 
 def _fsync_directory(path: Path) -> None:
+    if os.name == "nt":
+        return
     directory_fd = os.open(path, os.O_RDONLY)
     try:
         os.fsync(directory_fd)

@@ -295,6 +295,20 @@ def test_failed_atomic_save_preserves_prior_artifact(
         )
 
     assert path.read_bytes() == original
+
+
+def test_directory_fsync_is_skipped_when_unsupported_on_windows(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(persistence.os, "name", "nt")
+
+    def fail_open(*_: object, **__: object) -> int:
+        raise AssertionError("directory file descriptors are not supported on Windows")
+
+    monkeypatch.setattr(persistence.os, "open", fail_open)
+
+    persistence._fsync_directory(tmp_path)
     assert not tuple(tmp_path.glob("*.tmp"))
 
 
