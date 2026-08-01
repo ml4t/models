@@ -161,7 +161,12 @@ def compare_wheel(
         }
         rebuilt_members = {name: rebuilt_archive.read(name) for name in rebuilt_archive.namelist()}
     if candidate_members != rebuilt_members:
-        raise ValueError("rebuilt wheel contents do not match the candidate")
+        differing_members = sorted(
+            name
+            for name in candidate_members.keys() | rebuilt_members.keys()
+            if candidate_members.get(name) != rebuilt_members.get(name)
+        )
+        raise ValueError(f"rebuilt wheel contents do not match the candidate: {differing_members}")
     if require_byte_identical and _sha256(candidate_wheel) != _sha256(rebuilt_wheel):
         raise ValueError("rebuilt wheel is not byte-identical to the candidate")
 
