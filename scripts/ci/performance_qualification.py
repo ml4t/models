@@ -7,7 +7,6 @@ import hashlib
 import json
 import os
 import platform
-import resource
 import sys
 import tempfile
 import time
@@ -48,6 +47,14 @@ from ml4t.models import (
 SEED = 20260731
 CUDA_RTOL = 1e-5
 CUDA_ATOL = 1e-5
+
+
+def _peak_rss_kib() -> int | None:
+    if sys.platform == "win32":
+        return None
+    import resource
+
+    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
 
 
 @dataclass(frozen=True)
@@ -343,7 +350,7 @@ def _measure(
             "inference_seconds": inference_seconds,
             "load_seconds": load_seconds,
             "peak_cuda_reserved_bytes": peak_cuda_bytes,
-            "peak_rss_kib": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
+            "peak_rss_kib": _peak_rss_kib(),
             "recovered_inference_seconds": recovered_inference_seconds,
             "save_seconds": save_seconds,
             "shape": list(output.shape),

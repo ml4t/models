@@ -82,6 +82,9 @@ def test_ci_qualifies_one_candidate_across_required_platforms() -> None:
         "needs: [stable-platform, python-prerelease, dependency-audit, cuda-qualification]"
         in workflow
     )
+    assert "if: always()" in workflow
+    assert 'test "$CUDA_RESULT" = success' in workflow
+    assert 'test "$CUDA_RESULT" = skipped' in workflow
 
 
 def test_release_promotes_qualified_candidate_without_rebuilding() -> None:

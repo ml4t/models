@@ -80,6 +80,28 @@ assert portfolio.predict(
         _run([str(python), "-c", script], cwd=Path(directory))
 
 
+def _check_consumer_types(python: Path, consumer: Path, root: Path) -> None:
+    type_result = subprocess.run(
+        [
+            str(python),
+            "-m",
+            "ty",
+            "check",
+            "--python",
+            str(python),
+            str(consumer),
+        ],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if type_result.returncode == 0 or "invalid-assignment" not in (
+        type_result.stdout + type_result.stderr
+    ):
+        raise RuntimeError("installed-wheel consumer type check did not reject an invalid use")
+
+
 def test_wheel(candidate_dir: Path, python_version: str, mode: str) -> None:
     wheel = _wheel(candidate_dir)
     with tempfile.TemporaryDirectory() as directory:
@@ -151,17 +173,7 @@ def test_wheel(candidate_dir: Path, python_version: str, mode: str) -> None:
             "invalid: str = config.n_factors\n",
             encoding="utf-8",
         )
-        type_result = subprocess.run(
-            [str(test_python), "-m", "ty", "check", str(consumer)],
-            cwd=root,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if type_result.returncode == 0 or "invalid-assignment" not in (
-            type_result.stdout + type_result.stderr
-        ):
-            raise RuntimeError("installed-wheel consumer type check did not reject an invalid use")
+        _check_consumer_types(test_python, consumer, root)
 
 
 def main() -> None:
