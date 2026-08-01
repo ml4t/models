@@ -57,6 +57,12 @@ def test_workflow_actions_are_pinned_to_commits() -> None:
     assert all(re.search(r"@[0-9a-f]{40}(?:\s|$)", line) for line in action_references)
 
 
+def test_git_text_files_have_platform_independent_line_endings() -> None:
+    root = Path(__file__).parents[1]
+
+    assert "* text=auto eol=lf" in (root / ".gitattributes").read_text(encoding="utf-8")
+
+
 def test_ci_qualifies_one_candidate_across_required_platforms() -> None:
     root = Path(__file__).parents[1]
     workflow = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
