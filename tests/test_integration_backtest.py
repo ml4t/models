@@ -136,7 +136,7 @@ def test_backtest_datafeed_inputs_supports_prices_path_only() -> None:
 
     kwargs = inputs.to_datafeed_kwargs()
 
-    assert kwargs["prices_path"] == "/tmp/prices.parquet"
+    assert Path(kwargs["prices_path"]) == Path("/tmp/prices.parquet")
     assert kwargs["feed_spec"]["timestamp_col"] == "date"
     assert kwargs["feed_spec"]["entity_col"] == "symbol"
     assert kwargs["feed_spec"]["close_col"] == "settle"
