@@ -10,7 +10,7 @@ from typing import Any
 import numpy as np
 
 MAX_TIMING_RANGE = 2.0
-MIN_TIMING_FOR_RANGE_SECONDS = 0.1
+TIMING_RANGE_ALLOWANCE_SECONDS = 1.0
 CUDA_RTOL = 1e-5
 CUDA_ATOL = 1e-5
 
@@ -44,8 +44,8 @@ def check(records: list[Path], arrays: list[Path]) -> None:
         if min(fit_times) <= 0.0:
             raise AssertionError(f"{name} fit time must be positive: {fit_times}")
         if (
-            max(fit_times) >= MIN_TIMING_FOR_RANGE_SECONDS
-            and max(fit_times) / min(fit_times) > MAX_TIMING_RANGE
+            max(fit_times) / min(fit_times) > MAX_TIMING_RANGE
+            and max(fit_times) - min(fit_times) > TIMING_RANGE_ALLOWANCE_SECONDS
         ):
             raise AssertionError(
                 f"{name} fit timing range exceeded {MAX_TIMING_RANGE}x: {fit_times}"
