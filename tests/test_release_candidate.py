@@ -137,6 +137,16 @@ def test_performance_checker_ignores_submeasurement_timing_noise(tmp_path: Path)
     check_performance.check(records, arrays)
 
 
+def test_performance_checker_ignores_subsecond_timing_range(tmp_path: Path) -> None:
+    records, arrays = _performance_inputs(tmp_path)
+    for fit_seconds, record in zip((0.120, 0.136, 0.526), records, strict=True):
+        value = json.loads(record.read_text(encoding="utf-8"))
+        value["results"]["model"]["fit_seconds"] = fit_seconds
+        record.write_text(json.dumps(value), encoding="utf-8")
+
+    check_performance.check(records, arrays)
+
+
 def test_performance_checker_rejects_timing_and_replay_drift(tmp_path: Path) -> None:
     records, arrays = _performance_inputs(tmp_path)
     value = json.loads(records[2].read_text(encoding="utf-8"))
