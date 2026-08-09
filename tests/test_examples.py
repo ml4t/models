@@ -16,6 +16,12 @@ EXAMPLES = (
     "portfolio_learning.py",
 )
 
+DOCUMENTS = (
+    "README.md",
+    "docs/getting-started/quickstart.md",
+    "docs/user-guide/stochastic-discount-factor.md",
+)
+
 
 @pytest.mark.parametrize("example", EXAMPLES)
 def test_examples_execute(example: str) -> None:
@@ -24,15 +30,12 @@ def test_examples_execute(example: str) -> None:
 
 @pytest.mark.parametrize(
     "document",
-    (
-        "README.md",
-        "docs/getting-started/quickstart.md",
-        "docs/user-guide/stochastic-discount-factor.md",
-    ),
+    DOCUMENTS,
 )
 def test_documented_sdf_checkpoint_configs_are_valid(document: str) -> None:
     root = Path(__file__).parents[1]
-    code_blocks = re.findall(r"```python\n(.*?)```", (root / document).read_text(), re.DOTALL)
+    content = (root / document).read_text(encoding="utf-8")
+    code_blocks = re.findall(r"```python\r?\n(.*?)```", content, re.DOTALL)
     checked = 0
     for code_block in code_blocks:
         tree = ast.parse(code_block)
