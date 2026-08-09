@@ -16,6 +16,12 @@ CORE_TESTS = (
     "test_types.py",
 )
 
+DOCUMENTATION_TEST_INPUTS = (
+    Path("README.md"),
+    Path("docs/getting-started/quickstart.md"),
+    Path("docs/user-guide/stochastic-discount-factor.md"),
+)
+
 
 def _python_executable(venv: Path) -> Path:
     if os.name == "nt":
@@ -141,6 +147,10 @@ def test_wheel(candidate_dir: Path, python_version: str, mode: str) -> None:
 
         shutil.copytree("tests", root / "tests")
         shutil.copytree("examples", root / "examples")
+        for source in DOCUMENTATION_TEST_INPUTS:
+            destination = root / source
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, destination)
         if mode == "full":
             selected_tests = [str(root / "tests")]
             ignored = [

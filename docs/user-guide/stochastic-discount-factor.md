@@ -114,8 +114,8 @@ from ml4t.models import (
 
 model = StochasticDiscountFactorModel(
     StochasticDiscountFactorConfig(
-        checkpoint_epochs=(256, 512, 768, 1024, 1280),
-        default_checkpoint=1280,
+        checkpoint_epochs=(256, 512, 768, 1024),
+        default_checkpoint=("conditional", 1024),
     )
 )
 

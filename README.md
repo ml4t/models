@@ -120,7 +120,7 @@ batch = CrossSectionBatch(
 )
 
 model = StochasticDiscountFactorModel(
-    StochasticDiscountFactorConfig(checkpoint_epochs=(256, 512, 768, 1024, 1280))
+    StochasticDiscountFactorConfig(checkpoint_epochs=(256, 512, 768, 1024))
 )
 model.fit(batch)
 state = model.extract(batch, checkpoint=1280)
