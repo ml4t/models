@@ -205,7 +205,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="${{ github.ref_name }}"
-          args=("$tag" --generate-notes candidate/dist/* candidate/candidate.json)
+          args=(
+            "$tag"
+            --repo "${{ github.repository }}"
+            --generate-notes
+            candidate/dist/*
+            candidate/candidate.json
+          )
           if [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(a|b|rc)[0-9]+$ ]]; then
             args+=(--prerelease)
           fi
