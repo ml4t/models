@@ -110,6 +110,7 @@ def test_release_promotes_qualified_candidate_without_rebuilding() -> None:
     assert "scripts/ci/verify_docs_deployment.py" in workflow
     assert "https://ml4trading.io/docs/models/release.json" in verifier
     assert "needs: [select-candidate, docs]" in workflow
+    assert '--repo "${{ github.repository }}"' in workflow
 
 
 def test_security_policy_has_a_private_reporting_route_and_supported_versions() -> None:
