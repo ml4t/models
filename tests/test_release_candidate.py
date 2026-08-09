@@ -4,7 +4,10 @@ import json
 import subprocess
 import tarfile
 import zipfile
+from io import BytesIO
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
+from urllib.request import Request
 
 import numpy as np
 import pytest
@@ -15,6 +18,7 @@ from scripts.ci import (
     hardware_qualification,
     performance_qualification,
     test_wheel,
+    verify_docs_deployment,
 )
 
 
@@ -232,4 +236,36 @@ def test_hardware_qualification_separates_replay_and_cpu_recovery_tolerances() -
         cross_backend,
         "cuda",
         cpu_recovery=True,
+    )
+
+
+def test_docs_verifier_identifies_client_and_varies_retry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    expected = {"commit": "a" * 40, "version": "0.1.0"}
+    responses = iter(({"commit": "old", "version": "0.1.0"}, expected))
+    requests: list[Request] = []
+
+    def open_url(request: Request, *, timeout: int) -> BytesIO:
+        requests.append(request)
+        assert timeout == 20
+        return BytesIO(json.dumps(next(responses)).encode())
+
+    monkeypatch.setattr(verify_docs_deployment, "urlopen", open_url)
+    monkeypatch.setattr(verify_docs_deployment.time, "sleep", lambda _: None)
+
+    verify_docs_deployment.verify(
+        ("https://ml4trading.io/docs/models/release.json",),
+        expected,
+        attempts=2,
+        retry_seconds=0,
+    )
+
+    assert [parse_qs(urlparse(request.full_url).query)["attempt"] for request in requests] == [
+        ["0"],
+        ["1"],
+    ]
+    assert all(
+        request.get_header("User-agent") == verify_docs_deployment.USER_AGENT
+        for request in requests
     )

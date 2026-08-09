@@ -165,38 +165,7 @@ jobs:
         env:
           RELEASE_VERSION: ${{ steps.identity.outputs.version }}
           RELEASE_COMMIT: ${{ github.sha }}
-        run: |
-          python - <<'PY'
-          import json
-          import os
-          import time
-          from urllib.error import URLError
-          from urllib.request import urlopen
-
-          expected = {
-              "commit": os.environ["RELEASE_COMMIT"],
-              "version": os.environ["RELEASE_VERSION"],
-          }
-          urls = (
-              "https://ml4trading.io/docs/models/release.json",
-              f"https://ml4trading.io/docs/models/releases/{expected['version']}/release.json",
-          )
-          for attempt in range(20):
-              try:
-                  observed = []
-                  for url in urls:
-                      with urlopen(f"{url}?commit={expected['commit']}", timeout=20) as response:
-                          observed.append(json.load(response))
-                  if all(value == expected for value in observed):
-                      break
-              except (OSError, URLError, ValueError):
-                  pass
-              if attempt == 19:
-                  raise RuntimeError(
-                      f"deployed documentation identity did not match {expected!r}"
-                  )
-              time.sleep(15)
-          PY
+        run: uv run python scripts/ci/verify_docs_deployment.py
 
   publish:
     name: Publish to PyPI

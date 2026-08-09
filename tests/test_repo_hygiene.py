@@ -99,6 +99,7 @@ def test_ci_qualifies_one_candidate_across_required_platforms() -> None:
 def test_release_promotes_qualified_candidate_without_rebuilding() -> None:
     root = Path(__file__).parents[1]
     workflow = (root / ".github/workflows/release.yml").read_text(encoding="utf-8")
+    verifier = (root / "scripts/ci/verify_docs_deployment.py").read_text(encoding="utf-8")
 
     assert "uv build" not in workflow
     assert "--workflow ci.yml" in workflow
@@ -106,7 +107,8 @@ def test_release_promotes_qualified_candidate_without_rebuilding() -> None:
     assert "packages-dir: candidate/dist/" in workflow
     assert "name: Publish Qualified Documentation" in workflow
     assert "DOCS_DEPLOY_KEY is required for a stable release" in workflow
-    assert "https://ml4trading.io/docs/models/release.json" in workflow
+    assert "scripts/ci/verify_docs_deployment.py" in workflow
+    assert "https://ml4trading.io/docs/models/release.json" in verifier
     assert "needs: [select-candidate, docs]" in workflow
 
 
