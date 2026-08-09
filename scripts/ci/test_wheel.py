@@ -141,6 +141,8 @@ def test_wheel(candidate_dir: Path, python_version: str, mode: str) -> None:
 
         shutil.copytree("tests", root / "tests")
         shutil.copytree("examples", root / "examples")
+        shutil.copy2("README.md", root / "README.md")
+        shutil.copytree("docs", root / "docs")
         if mode == "full":
             selected_tests = [str(root / "tests")]
             ignored = [
