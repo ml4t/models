@@ -799,6 +799,15 @@ dev = [
     { name = "twine" },
     { name = "ty" },
 ]
+test = [
+    { name = "ml4t-specs" },
+    { name = "polars" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.15'" },
+    { name = "torch", version = "2.14.0.dev20260725", source = { registry = "https://download.pytorch.org/whl/nightly/cpu" }, marker = "python_full_version >= '3.15' and sys_platform == 'darwin'" },
+    { name = "torch", version = "2.14.0.dev20260725+cpu", source = { registry = "https://download.pytorch.org/whl/nightly/cpu" }, marker = "python_full_version >= '3.15' and sys_platform != 'darwin'" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -839,6 +848,14 @@ dev = [
     { name = "torch", marker = "python_full_version >= '3.15'", specifier = "==2.14.0.dev20260725", index = "https://download.pytorch.org/whl/nightly/cpu" },
     { name = "twine", specifier = ">=6.0.0" },
     { name = "ty", specifier = ">=0.0.32" },
+]
+test = [
+    { name = "ml4t-specs", specifier = ">=0.1.0b0" },
+    { name = "polars", specifier = ">=1.0.0" },
+    { name = "pytest", specifier = ">=9.0.3" },
+    { name = "pytest-cov", specifier = ">=5.0.0" },
+    { name = "torch", marker = "python_full_version < '3.15'", specifier = ">=2.13.0" },
+    { name = "torch", marker = "python_full_version >= '3.15'", specifier = "==2.14.0.dev20260725", index = "https://download.pytorch.org/whl/nightly/cpu" },
 ]
 
 [[package]]

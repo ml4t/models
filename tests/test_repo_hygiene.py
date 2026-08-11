@@ -102,7 +102,7 @@ def test_python_315_uses_a_cross_platform_pytorch_nightly() -> None:
     project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
     prerelease_requirement = "torch==2.14.0.dev20260725; python_version >= '3.15'"
 
-    assert prerelease_requirement in project["dependency-groups"]["dev"]
+    assert prerelease_requirement in project["dependency-groups"]["test"]
     assert prerelease_requirement in project["project"]["optional-dependencies"]["deep"]
     assert project["tool"]["uv"]["sources"]["torch"] == [
         {"index": "pytorch-nightly-cpu", "marker": "python_version >= '3.15'"}
