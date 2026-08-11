@@ -1,6 +1,6 @@
 site_name: ML4T Models
 site_description: Finance-native model implementations for latent factors and portfolio learning
-site_url: https://ml4trading.io/docs/models/
+site_url: https://www.ml4trading.io/docs/models/
 repo_url: https://github.com/ml4t/models
 repo_name: ml4t/models
 

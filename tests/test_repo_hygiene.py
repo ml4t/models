@@ -109,7 +109,7 @@ def test_release_promotes_qualified_candidate_without_rebuilding() -> None:
     assert "DOCS_DEPLOY_KEY is required for a stable release" in workflow
     assert "scripts/ci/verify_docs_deployment.py" in workflow
     assert "https://ml4trading.io/docs/models/release.json" in verifier
-    assert "needs: [select-candidate, docs]" in workflow
+    assert "needs: [ecosystem-qualification, select-candidate, docs]" in workflow
     assert '--repo "${{ github.repository }}"' in workflow
 
 
