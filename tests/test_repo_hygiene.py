@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import subprocess
+import tomllib
 from pathlib import Path
 
 import ml4t.models as models
@@ -94,6 +95,25 @@ def test_ci_qualifies_one_candidate_across_required_platforms() -> None:
     assert "if: always()" in workflow
     assert 'test "$CUDA_RESULT" = success' in workflow
     assert 'test "$CUDA_RESULT" = skipped' in workflow
+
+
+def test_python_315_uses_a_cross_platform_pytorch_nightly() -> None:
+    root = Path(__file__).parents[1]
+    project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    prerelease_requirement = "torch==2.14.0.dev20260725; python_version >= '3.15'"
+
+    assert prerelease_requirement in project["dependency-groups"]["dev"]
+    assert prerelease_requirement in project["project"]["optional-dependencies"]["deep"]
+    assert project["tool"]["uv"]["sources"]["torch"] == [
+        {"index": "pytorch-nightly-cpu", "marker": "python_version >= '3.15'"}
+    ]
+    assert project["tool"]["uv"]["index"] == [
+        {
+            "name": "pytorch-nightly-cpu",
+            "url": "https://download.pytorch.org/whl/nightly/cpu",
+            "explicit": True,
+        }
+    ]
 
 
 def test_release_promotes_qualified_candidate_without_rebuilding() -> None:
