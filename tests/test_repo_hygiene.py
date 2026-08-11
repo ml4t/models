@@ -100,7 +100,7 @@ def test_ci_qualifies_one_candidate_across_required_platforms() -> None:
 def test_python_315_uses_a_cross_platform_pytorch_nightly() -> None:
     root = Path(__file__).parents[1]
     project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
-    prerelease_requirement = "torch==2.14.0.dev20260725; python_version >= '3.15'"
+    prerelease_requirement = "torch==2.14.0.dev20260810; python_version >= '3.15'"
 
     assert prerelease_requirement in project["dependency-groups"]["test"]
     assert prerelease_requirement in project["project"]["optional-dependencies"]["deep"]
