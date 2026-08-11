@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import subprocess
+import tomllib
 from pathlib import Path
 
 import ml4t.models as models
@@ -96,6 +97,32 @@ def test_ci_qualifies_one_candidate_across_required_platforms() -> None:
     assert 'test "$CUDA_RESULT" = skipped' in workflow
 
 
+def test_python_315_qualifies_the_published_core_without_torch() -> None:
+    root = Path(__file__).parents[1]
+    project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    workflow = (root / ".github/workflows/ecosystem.yml").read_text(encoding="utf-8")
+
+    assert not any(
+        "torch" in requirement and "python_version >= '3.15'" in requirement
+        for requirement in project["dependency-groups"]["test"]
+    )
+    assert not any(
+        "torch" in requirement and "python_version >= '3.15'" in requirement
+        for requirement in project["project"]["optional-dependencies"]["deep"]
+    )
+    assert "pytorch-nightly" not in (root / "pyproject.toml").read_text(encoding="utf-8")
+    assert "prerelease-test-paths:" in workflow
+    for test_name in (
+        "test_configs.py",
+        "test_forecasters.py",
+        "test_integration_data.py",
+        "test_pca_pipeline.py",
+        "test_rp_pca.py",
+        "test_types.py",
+    ):
+        assert test_name in workflow
+
+
 def test_release_promotes_qualified_candidate_without_rebuilding() -> None:
     root = Path(__file__).parents[1]
     workflow = (root / ".github/workflows/release.yml").read_text(encoding="utf-8")
@@ -109,7 +136,7 @@ def test_release_promotes_qualified_candidate_without_rebuilding() -> None:
     assert "DOCS_DEPLOY_KEY is required for a stable release" in workflow
     assert "scripts/ci/verify_docs_deployment.py" in workflow
     assert "https://ml4trading.io/docs/models/release.json" in verifier
-    assert "needs: [select-candidate, docs]" in workflow
+    assert "needs: [ecosystem-qualification, select-candidate, docs]" in workflow
     assert '--repo "${{ github.repository }}"' in workflow
 
 
