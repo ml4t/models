@@ -17,6 +17,9 @@ jobs:
   qualification:
     permissions:
       contents: read
-    uses: ml4t/ecosystem/.github/workflows/qualify-library.yml@736599a738747dcf1e874a4e552ca018c0057cab # v0.1.0
+    uses: ml4t/ecosystem/.github/workflows/qualify-library.yml@5b3ac5daac7bb9b62abde4c16974b20f8804fdc1 # v0.1.0
     with:
       import-package: ml4t.models
+      prerelease-test-paths: >-
+        ["tests/test_configs.py", "tests/test_forecasters.py", "tests/test_integration_data.py",
+        "tests/test_pca_pipeline.py", "tests/test_rp_pca.py", "tests/test_types.py"]

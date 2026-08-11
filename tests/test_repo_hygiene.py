@@ -97,23 +97,30 @@ def test_ci_qualifies_one_candidate_across_required_platforms() -> None:
     assert 'test "$CUDA_RESULT" = skipped' in workflow
 
 
-def test_python_315_uses_a_cross_platform_pytorch_nightly() -> None:
+def test_python_315_qualifies_the_published_core_without_torch() -> None:
     root = Path(__file__).parents[1]
     project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
-    prerelease_requirement = "torch==2.14.0.dev20260810; python_version >= '3.15'"
+    workflow = (root / ".github/workflows/ecosystem.yml").read_text(encoding="utf-8")
 
-    assert prerelease_requirement in project["dependency-groups"]["test"]
-    assert prerelease_requirement in project["project"]["optional-dependencies"]["deep"]
-    assert project["tool"]["uv"]["sources"]["torch"] == [
-        {"index": "pytorch-nightly-cpu", "marker": "python_version >= '3.15'"}
-    ]
-    assert project["tool"]["uv"]["index"] == [
-        {
-            "name": "pytorch-nightly-cpu",
-            "url": "https://download.pytorch.org/whl/nightly/cpu",
-            "explicit": True,
-        }
-    ]
+    assert not any(
+        "torch" in requirement and "python_version >= '3.15'" in requirement
+        for requirement in project["dependency-groups"]["test"]
+    )
+    assert not any(
+        "torch" in requirement and "python_version >= '3.15'" in requirement
+        for requirement in project["project"]["optional-dependencies"]["deep"]
+    )
+    assert "pytorch-nightly" not in (root / "pyproject.toml").read_text(encoding="utf-8")
+    assert "prerelease-test-paths:" in workflow
+    for test_name in (
+        "test_configs.py",
+        "test_forecasters.py",
+        "test_integration_data.py",
+        "test_pca_pipeline.py",
+        "test_rp_pca.py",
+        "test_types.py",
+    ):
+        assert test_name in workflow
 
 
 def test_release_promotes_qualified_candidate_without_rebuilding() -> None:
