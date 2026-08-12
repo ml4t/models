@@ -19,6 +19,9 @@ jobs:
     uses: ml4t/ecosystem/.github/workflows/qualify-library.yml@457678d8860d0c816b1dc376e7e2691daa93af4d # v0.1.0
     with:
       import-package: ml4t.models
+      prerelease-test-paths: >-
+        ["tests/test_configs.py", "tests/test_forecasters.py", "tests/test_integration_data.py",
+        "tests/test_pca_pipeline.py", "tests/test_rp_pca.py", "tests/test_types.py"]
 
   select-candidate:
     name: Select Qualified Candidate

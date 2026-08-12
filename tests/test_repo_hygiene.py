@@ -100,7 +100,10 @@ def test_ci_qualifies_one_candidate_across_required_platforms() -> None:
 def test_python_315_qualifies_the_published_core_without_torch() -> None:
     root = Path(__file__).parents[1]
     project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
-    workflow = (root / ".github/workflows/ecosystem.yml").read_text(encoding="utf-8")
+    workflows = tuple(
+        (root / ".github/workflows" / name).read_text(encoding="utf-8")
+        for name in ("ecosystem.yml", "release.yml")
+    )
 
     assert not any(
         "torch" in requirement and "python_version >= '3.15'" in requirement
@@ -111,16 +114,24 @@ def test_python_315_qualifies_the_published_core_without_torch() -> None:
         for requirement in project["project"]["optional-dependencies"]["deep"]
     )
     assert "pytorch-nightly" not in (root / "pyproject.toml").read_text(encoding="utf-8")
-    assert "prerelease-test-paths:" in workflow
-    for test_name in (
-        "test_configs.py",
-        "test_forecasters.py",
-        "test_integration_data.py",
-        "test_pca_pipeline.py",
-        "test_rp_pca.py",
-        "test_types.py",
-    ):
-        assert test_name in workflow
+    expected = {
+        "tests/test_configs.py",
+        "tests/test_forecasters.py",
+        "tests/test_integration_data.py",
+        "tests/test_pca_pipeline.py",
+        "tests/test_rp_pca.py",
+        "tests/test_types.py",
+    }
+    configured_paths = []
+    for workflow in workflows:
+        match = re.search(
+            r"(?m)^      prerelease-test-paths: >-\n(?P<paths>(?:        .*\n?)+)",
+            workflow,
+        )
+        assert match is not None
+        configured_paths.append(set(re.findall(r'"([^"]+)"', match["paths"])))
+
+    assert configured_paths == [expected, expected]
 
 
 def test_release_promotes_qualified_candidate_without_rebuilding() -> None:
