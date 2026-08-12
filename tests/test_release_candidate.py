@@ -12,6 +12,7 @@ from urllib.request import Request
 import numpy as np
 import pytest
 
+from ml4t.models import __version__
 from scripts.ci import (
     candidate,
     check_performance,
@@ -35,16 +36,16 @@ def test_candidate_manifest_binds_artifacts_to_source_identity(candidate_dir: Pa
         candidate_dir,
         expected_commit="a" * 40,
         expected_tree="b" * 40,
-        expected_tag="v0.1.0",
+        expected_tag=f"v{__version__}",
     )
 
     manifest = json.loads((candidate_dir / "candidate.json").read_text(encoding="utf-8"))
 
     assert manifest["name"] == "ml4t-models"
-    assert manifest["version"] == "0.1.0"
+    assert manifest["version"] == __version__
     assert {record["filename"] for record in manifest["artifacts"]} == {
-        "ml4t_models-0.1.0-py3-none-any.whl",
-        "ml4t_models-0.1.0.tar.gz",
+        f"ml4t_models-{__version__}-py3-none-any.whl",
+        f"ml4t_models-{__version__}.tar.gz",
     }
 
 
