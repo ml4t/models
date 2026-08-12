@@ -53,6 +53,20 @@ We should avoid:
 - one-off domain applications that do not generalize
 - speculative agentic or multi-agent systems before the core finance stack is mature
 
+## Candidate Classification
+
+The post-stability review classifies proposals by their fit with this library. "Accepted" means a
+candidate may receive an implementation issue after Phase 1 is complete. It does not commit a
+release date.
+
+| Library fit | Accepted candidates | Deferred candidates or work |
+|---|---|---|
+| Latent factors | `ProximateFactorModel`, `EconomicTargetFactorModel` | `StateVaryingFactorModel` and `WeakFactorModel` until the static and sparse factor paths are complete |
+| SDF and no-arbitrage | None | Further candidates until they add a distinct contract beyond `StochasticDiscountFactorModel` |
+| Portfolio learning | `ImplementableEfficientFrontierModel` | `RecursivePortfolioMachines` until the weight-native baseline is complete |
+| Options analytics | None | Design the options-surface batch contract before accepting `ImpliedVolatilitySurfaceModel` |
+| Other research directions | None | Survey-only papers, application-specific models, RL agents, execution agents, and LLM or multi-agent systems |
+
 ## Phase 1: Finish The Core
 
 These are the highest-priority non-model items.
@@ -98,7 +112,15 @@ Expected family:
 
 Expected contract:
 
-- `PersistentPanelBatch`
+- input: `PersistentPanelBatch`
+- output: `FitSummary` and `LatentFactorState` with sparse proximate loadings
+
+Required tests and documentation:
+
+- recover known sparse factors on seeded synthetic panels and test loading-selection edge cases
+- verify deterministic shapes, validation failures, persistence, and installed-wheel public imports
+- add API reference and a worked sparse-factor example that hands results to the standard forecast
+  pipeline
 
 ### B. `ImplementableEfficientFrontierModel`
 
@@ -117,7 +139,16 @@ Expected family:
 
 Expected contract:
 
-- `PortfolioSequenceBatch`
+- input: `PortfolioSequenceBatch`
+- output: `FitSummary` and `PortfolioWeightsResult`
+
+Required tests and documentation:
+
+- reproduce a seeded efficient-frontier fixture and enforce budget and configured constraint
+  invariants
+- verify deterministic outputs, invalid-input failures, persistence, and installed-wheel public
+  imports
+- add API reference and a worked portfolio-construction example with backtest handoff
 
 ### C. `EconomicTargetFactorModel`
 
@@ -137,7 +168,14 @@ Expected family:
 
 Expected contract:
 
-- `PersistentPanelBatch`
+- input: `PersistentPanelBatch` plus documented economic target features
+- output: `FitSummary` and `LatentFactorState`
+
+Required tests and documentation:
+
+- recover target-aligned factors on seeded synthetic panels and test missing or misaligned targets
+- verify deterministic shapes, validation failures, persistence, and installed-wheel public imports
+- add API reference and a worked example that contrasts target-aligned and unconstrained factors
 
 ## Phase 3: Structured Extensions
 
