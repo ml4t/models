@@ -17,3 +17,5 @@ ENV/
 .hypothesis/
 CLAUDE.md
 .claude/
+.codex/
+.workspace/
