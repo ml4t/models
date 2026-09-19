@@ -185,7 +185,17 @@ def test_rendered_docs_expose_exact_release_identity(tmp_path: Path) -> None:
         "ML4T_DOCS_VERSION": expected["version"],
     }
     subprocess.run(
-        ["uv", "run", "mkdocs", "build", "--strict", "--site-dir", str(tmp_path)],
+        [
+            "uv",
+            "run",
+            "--extra",
+            "docs",
+            "mkdocs",
+            "build",
+            "--strict",
+            "--site-dir",
+            str(tmp_path),
+        ],
         cwd=ROOT,
         env=environment,
         check=True,
