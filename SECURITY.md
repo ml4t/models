@@ -12,7 +12,7 @@ remain supported only until the next stable release replaces them.
 
 ## Report a Vulnerability
 
-Report suspected vulnerabilities privately by email to `stefan@ml4trading.io` with the subject
+Report suspected vulnerabilities privately by email to `pm@ml4trading.io` with the subject
 `[ml4t-models security]`. Do not open a public issue.
 
 Include the affected version, impact, reproduction steps, and any known mitigation. Do not include

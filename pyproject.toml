@@ -27,14 +27,14 @@ include = [
 [project]
 name = "ml4t-models"
 dynamic = ["version"]
-description = "Finance-specific latent-factor and portfolio-learning models for ML4T"
+description = "Finance-specific models for asset pricing, prediction, and portfolio learning"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [
-    { name = "Stefan Jansen", email = "stefan@ml4trading.io" },
+    { name = "Stefan Jansen", email = "stefan@applied-ai.com" },
 ]
 maintainers = [
-    { name = "Stefan Jansen", email = "stefan@ml4trading.io" },
+    { name = "Stefan Jansen", email = "pm@ml4trading.io" },
 ]
 keywords = [
     "finance",
@@ -95,7 +95,7 @@ all = [
 ]
 
 [project.urls]
-Homepage = "https://ml4trading.io/docs/models/"
+Homepage = "https://www.ml4trading.io/"
 Documentation = "https://www.ml4trading.io/docs/models/"
 Repository = "https://github.com/ml4t/models"
 Issues = "https://github.com/ml4t/models/issues"

@@ -155,6 +155,6 @@ def test_security_policy_has_a_private_reporting_route_and_supported_versions() 
     root = Path(__file__).parents[1]
     policy = (root / "SECURITY.md").read_text(encoding="utf-8")
 
-    assert "stefan@ml4trading.io" in policy
+    assert "pm@ml4trading.io" in policy
     assert "Do not open a public issue" in policy
     assert "Latest stable `0.1.x`" in policy
