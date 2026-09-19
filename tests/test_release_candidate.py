@@ -43,6 +43,8 @@ def test_candidate_manifest_binds_artifacts_to_source_identity(candidate_dir: Pa
 
     assert manifest["name"] == "ml4t-models"
     assert manifest["version"] == __version__
+    assert manifest["metadata"]["description"]
+    assert manifest["metadata"]["project_urls"]
     assert {record["filename"] for record in manifest["artifacts"]} == {
         f"ml4t_models-{__version__}-py3-none-any.whl",
         f"ml4t_models-{__version__}.tar.gz",

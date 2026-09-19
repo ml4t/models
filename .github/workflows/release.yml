@@ -1,121 +1,155 @@
 name: Release
 
 on:
-  push:
-    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Package version without the v prefix
+        required: true
+        type: string
+      candidate_commit:
+        description: Full commit SHA currently at the tip of main
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.version }}
   cancel-in-progress: false
 
 jobs:
-  ecosystem-qualification:
-    name: Ecosystem Qualification
+  validate:
+    name: Validate Release Request
+    runs-on: ubuntu-latest
     permissions:
       contents: read
-    uses: ml4t/ecosystem/.github/workflows/qualify-library.yml@457678d8860d0c816b1dc376e7e2691daa93af4d # v0.1.0
+    outputs:
+      commit: ${{ steps.identity.outputs.commit }}
+      tree: ${{ steps.identity.outputs.tree }}
+      version: ${{ steps.identity.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.candidate_commit }}
+          fetch-depth: 0
+
+      - name: Fetch current main and release tags
+        run: git fetch origin main --tags
+
+      - name: Require the current main commit and an unused version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python scripts/ci/release.py preflight
+          --version "${{ inputs.version }}"
+          --candidate-commit "${{ inputs.candidate_commit }}"
+          --workflow-commit "${{ github.sha }}"
+          --repository "${{ github.repository }}"
+
+      - name: Record accepted release identity
+        id: identity
+        run: |
+          {
+            echo "commit=${{ inputs.candidate_commit }}"
+            echo "tree=$(git rev-parse 'HEAD^{tree}')"
+            echo "version=${{ inputs.version }}"
+          } >> "$GITHUB_OUTPUT"
+
+  ecosystem-qualification:
+    name: Ecosystem Qualification
+    needs: validate
+    permissions:
+      contents: read
+    uses: ml4t/ecosystem/.github/workflows/qualify-library.yml@da2cbb9a9d0b4d2f166ad630470ff7d7a1aa2643 # 2026-09-19 policy snapshot
     with:
       import-package: ml4t.models
       prerelease-test-paths: >-
         ["tests/test_configs.py", "tests/test_forecasters.py", "tests/test_integration_data.py",
         "tests/test_pca_pipeline.py", "tests/test_rp_pca.py", "tests/test_types.py"]
 
+  qualification:
+    name: Qualify Release Candidate
+    needs: validate
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+    with:
+      release_version: ${{ needs.validate.outputs.version }}
+
   select-candidate:
     name: Select Qualified Candidate
     runs-on: ubuntu-latest
+    needs: [validate, ecosystem-qualification, qualification]
     permissions:
       actions: read
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.validate.outputs.commit }}
           fetch-depth: 0
 
-      - name: Find successful main CI run
-        id: ci-run
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          run_id="$(gh run list \
-            --repo "${{ github.repository }}" \
-            --workflow ci.yml \
-            --commit "${{ github.sha }}" \
-            --branch main \
-            --event push \
-            --status success \
-            --limit 1 \
-            --json databaseId \
-            --jq '.[0].databaseId')"
-          if [[ -z "$run_id" ]]; then
-            echo "No successful main CI run exists for ${{ github.sha }}" >&2
-            exit 1
-          fi
-          echo "run-id=$run_id" >> "$GITHUB_OUTPUT"
+      - name: Download the candidate qualified by CI
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-candidate
+          path: candidate
 
-      - name: Download qualified candidate
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: >-
-          gh run download "${{ steps.ci-run.outputs.run-id }}"
-          --repo "${{ github.repository }}"
-          --name release-candidate
-          --dir candidate
-
-      - name: Verify tag and candidate identity
+      - name: Verify candidate commit, tree, version, and SHA256 manifest
         run: >-
           python scripts/ci/candidate.py verify candidate
-          --expected-commit "${{ github.sha }}"
-          --expected-tree "$(git rev-parse HEAD^{tree})"
-          --expected-tag "${{ github.ref_name }}"
+          --expected-commit "${{ needs.validate.outputs.commit }}"
+          --expected-tree "${{ needs.validate.outputs.tree }}"
+          --expected-tag "v${{ needs.validate.outputs.version }}"
 
-      - name: Retain selected candidate
+      - name: Retain the selected candidate
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: qualified-release-candidate
           path: candidate/
           if-no-files-found: error
+          retention-days: 90
 
   docs:
     name: Publish Qualified Documentation
     runs-on: ubuntu-latest
-    needs: select-candidate
+    needs: [validate, select-candidate]
+    environment: documentation
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
-          version: "latest"
+          ref: ${{ needs.validate.outputs.commit }}
 
-      - name: Set up Python
-        id: setup-python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.10.9"
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
 
-      - name: Download selected candidate
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: qualified-release-candidate
           path: candidate
 
-      - name: Resolve release identity
-        id: identity
-        run: |
-          version="$(python -c 'import json; print(json.load(open("candidate/candidate.json"))["version"])')"
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
+      - name: Verify selected candidate
+        run: >-
+          python scripts/ci/candidate.py verify candidate
+          --expected-commit "${{ needs.validate.outputs.commit }}"
+          --expected-tree "${{ needs.validate.outputs.tree }}"
+          --expected-tag "v${{ needs.validate.outputs.version }}"
 
       - name: Build revision-identified documentation
         env:
-          ML4T_DOCS_VERSION: ${{ steps.identity.outputs.version }}
-          ML4T_DOCS_COMMIT: ${{ github.sha }}
+          ML4T_DOCS_COMMIT: ${{ needs.validate.outputs.commit }}
+          ML4T_DOCS_VERSION: ${{ needs.validate.outputs.version }}
         run: |
-          uv sync --dev --extra docs --python "${{ steps.setup-python.outputs.python-path }}"
+          uv sync --frozen --dev --extra docs --python 3.12
           uv run mkdocs build --strict
           python - <<'PY'
           import json
@@ -126,6 +160,7 @@ jobs:
               json.dumps(
                   {
                       "commit": os.environ["ML4T_DOCS_COMMIT"],
+                      "library": "models",
                       "version": os.environ["ML4T_DOCS_VERSION"],
                   },
                   sort_keys=True,
@@ -138,11 +173,7 @@ jobs:
       - name: Require deploy credentials
         env:
           DOCS_DEPLOY_KEY: ${{ secrets.DOCS_DEPLOY_KEY }}
-        run: |
-          if [[ -z "$DOCS_DEPLOY_KEY" ]]; then
-            echo "DOCS_DEPLOY_KEY is required for a stable release" >&2
-            exit 1
-          fi
+        run: test -n "$DOCS_DEPLOY_KEY"
 
       - name: Deploy stable documentation
         uses: cpina/github-action-push-to-another-repository@55306faa4ed53b815ae49e564af8cfb359d32ae2 # v1.7.3
@@ -154,7 +185,7 @@ jobs:
           destination-repository-name: website
           target-directory: static/docs/models/
           target-branch: main
-          commit-message: "docs(models): publish ${{ github.ref_name }} from ${{ github.sha }}"
+          commit-message: "docs(models): publish v${{ needs.validate.outputs.version }} from ${{ needs.validate.outputs.commit }}"
           user-name: ml4t-bot
           user-email: bot@ml4trading.io
 
@@ -166,64 +197,158 @@ jobs:
           source-directory: site/
           destination-github-username: ml4t
           destination-repository-name: website
-          target-directory: static/docs/models/releases/${{ steps.identity.outputs.version }}/
+          target-directory: static/docs/models/releases/${{ needs.validate.outputs.version }}/
           target-branch: main
-          commit-message: "docs(models): retain ${{ github.ref_name }} from ${{ github.sha }}"
+          commit-message: "docs(models): retain v${{ needs.validate.outputs.version }} from ${{ needs.validate.outputs.commit }}"
           user-name: ml4t-bot
           user-email: bot@ml4trading.io
 
       - name: Verify deployed documentation identity
         env:
-          RELEASE_VERSION: ${{ steps.identity.outputs.version }}
-          RELEASE_COMMIT: ${{ github.sha }}
+          RELEASE_COMMIT: ${{ needs.validate.outputs.commit }}
+          RELEASE_VERSION: ${{ needs.validate.outputs.version }}
         run: uv run python scripts/ci/verify_docs_deployment.py
 
   publish:
-    name: Publish to PyPI
+    name: Publish Exact Candidate to PyPI
     runs-on: ubuntu-latest
-    needs: [ecosystem-qualification, select-candidate, docs]
+    needs: [validate, ecosystem-qualification, select-candidate, docs]
     environment: pypi
     permissions:
+      contents: read
       id-token: write
     steps:
-      - name: Download selected candidate
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: qualified-release-candidate
           path: candidate
 
-      - name: Publish to PyPI
+      - name: Publish the qualified artifacts
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
         with:
           packages-dir: candidate/dist/
+          verify-metadata: true
           print-hash: true
+          attestations: true
 
   github-release:
-    name: Create GitHub Release
+    name: Create Commit-Bound GitHub Release
     runs-on: ubuntu-latest
-    needs: publish
+    needs: [validate, publish]
     permissions:
       contents: write
     steps:
-      - name: Download selected candidate
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: qualified-release-candidate
           path: candidate
 
-      - name: Create GitHub Release
+      - name: Create tag and release from the candidate commit
         env:
+          CANDIDATE_COMMIT: ${{ needs.validate.outputs.commit }}
           GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ needs.validate.outputs.version }}
         run: |
-          tag="${{ github.ref_name }}"
           args=(
-            "$tag"
+            "v${RELEASE_VERSION}"
             --repo "${{ github.repository }}"
+            --target "$CANDIDATE_COMMIT"
             --generate-notes
             candidate/dist/*
             candidate/candidate.json
           )
-          if [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(a|b|rc)[0-9]+$ ]]; then
+          if [[ "$RELEASE_VERSION" =~ (a|b|rc)[0-9]+$ ]]; then
             args+=(--prerelease)
           fi
           gh release create "${args[@]}"
+
+  verify-release:
+    name: Verify Published Release
+    runs-on: ubuntu-latest
+    needs: [validate, github-release]
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.10.9"
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: qualified-release-candidate
+          path: candidate
+
+      - name: Verify PyPI metadata and artifact SHA256 digests
+        run: python scripts/ci/release.py verify candidate
+
+      - name: Install the published wheel and execute the README quick start
+        run: >-
+          python scripts/ci/release.py smoke-test
+          ml4t-models "${{ needs.validate.outputs.version }}"
+          scripts/ci/readme_smoke.py
+
+      - name: Download and verify GitHub release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          mkdir -p released/dist
+          gh release download "v${RELEASE_VERSION}" --repo "${{ github.repository }}" \
+            --pattern candidate.json --dir released
+          gh release download "v${RELEASE_VERSION}" --repo "${{ github.repository }}" \
+            --pattern '*.whl' --pattern '*.tar.gz' --dir released/dist
+          python scripts/ci/candidate.py verify released \
+            --expected-commit "${{ needs.validate.outputs.commit }}" \
+            --expected-tree "${{ needs.validate.outputs.tree }}" \
+            --expected-tag "v${RELEASE_VERSION}"
+
+      - name: Repeat deployed documentation identity check
+        env:
+          RELEASE_COMMIT: ${{ needs.validate.outputs.commit }}
+          RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+        run: python scripts/ci/verify_docs_deployment.py
+
+  recovery:
+    name: Record Post-Publication Recovery
+    runs-on: ubuntu-latest
+    needs: [validate, publish, github-release, verify-release]
+    if: >-
+      ${{ always() && needs.validate.result == 'success' &&
+      needs.publish.result != 'skipped' &&
+      (needs.publish.result != 'success' || needs.github-release.result != 'success' ||
+      needs.verify-release.result != 'success') }}
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+
+      - name: Check whether publication crossed the PyPI boundary
+        id: publication
+        continue-on-error: true
+        run: >-
+          python scripts/ci/release.py publication-exists
+          ml4t-models "${{ needs.validate.outputs.version }}"
+
+      - name: Create the recovery issue once
+        if: ${{ steps.publication.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ needs.validate.outputs.commit }}
+          RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          marker="release-recovery:v${RELEASE_VERSION}:${RELEASE_COMMIT}"
+          if gh issue list --repo "${{ github.repository }}" --state all \
+            --search "$marker" --json number --jq 'length' | grep -qx '0'; then
+            gh issue create \
+              --repo "${{ github.repository }}" \
+              --title "Recover incomplete v${RELEASE_VERSION} publication" \
+              --body "PyPI accepted v${RELEASE_VERSION} from ${RELEASE_COMMIT}, but a later release stage failed. Inspect workflow run ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}. Rerun only failed jobs so the retained candidate is reused. Do not rebuild or reuse this version for different bytes. ${marker}"
+          fi

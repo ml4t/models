@@ -55,12 +55,13 @@ def verify(
 def main() -> None:
     expected = {
         "commit": os.environ["RELEASE_COMMIT"],
+        "library": "models",
         "version": os.environ["RELEASE_VERSION"],
     }
     verify(
         (
-            "https://ml4trading.io/docs/models/release.json",
-            f"https://ml4trading.io/docs/models/releases/{expected['version']}/release.json",
+            "https://www.ml4trading.io/docs/models/release.json",
+            f"https://www.ml4trading.io/docs/models/releases/{expected['version']}/release.json",
         ),
         expected,
     )
