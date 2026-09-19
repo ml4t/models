@@ -6,7 +6,7 @@
 
 Finance-native model implementations for latent-factor estimation, stochastic discount factor learning, direct asset prediction, and end-to-end portfolio learning.
 
-Documentation: https://ml4trading.io/docs/models/
+Documentation: [ml4trading.io/docs/models](https://www.ml4trading.io/docs/models/)
 
 ## Part of the ML4T Library Ecosystem
 
@@ -213,3 +213,26 @@ Portfolio models learn allocations directly:
 - [Architecture](docs/reference/architecture.md)
 - [API Reference](docs/api/index.md)
 - [Book Guide](docs/book-guide/index.md)
+
+## Development
+
+Install the locked development environment, then run the repository gates before opening a pull
+request:
+
+```bash
+uv sync --locked --dev --extra docs
+uv run ruff check src/ tests/ examples/ scripts/
+uv run ruff format --check src/ tests/ examples/ scripts/
+uv run ty check
+uv run pytest tests/ -q --cov-report=json:coverage.json
+uv run python scripts/ci/check_coverage.py coverage.json
+uv run mkdocs build --strict
+uv build
+```
+
+## Project Links
+
+- [Documentation](https://www.ml4trading.io/docs/models/)
+- [Issues](https://github.com/ml4t/models/issues)
+- [Releases](https://github.com/ml4t/models/releases)
+- [License](LICENSE)
