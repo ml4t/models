@@ -168,10 +168,38 @@ def test_deployed_docs_default_retry_window_is_four_minutes(
     monkeypatch.setattr(verify_docs_deployment.time, "sleep", sleeps.append)
 
     with pytest.raises(RuntimeError, match="deployed documentation identity did not match"):
-        verify_docs_deployment.verify(("https://example.test/release.json",), {"commit": COMMIT})
+        verify_docs_deployment.verify(
+            ("https://example.test/release.json",),
+            {"commit": COMMIT},
+        )
 
     assert attempts == list(range(24))
     assert sleeps == [10] * 23
+
+
+def test_rendered_docs_expose_exact_release_identity(tmp_path: Path) -> None:
+    expected = {"commit": COMMIT, "library": "models", "version": __version__}
+    environment = {
+        **os.environ,
+        "ML4T_DOCS_COMMIT": expected["commit"],
+        "ML4T_DOCS_VERSION": expected["version"],
+    }
+    subprocess.run(
+        ["uv", "run", "mkdocs", "build", "--strict", "--site-dir", str(tmp_path)],
+        cwd=ROOT,
+        env=environment,
+        check=True,
+    )
+
+    verify_docs_deployment.verify_site(tmp_path, expected)
+    index = tmp_path / "index.html"
+    html = index.read_text(encoding="utf-8").replace(
+        f'<meta name="ml4t-version" content="{__version__}">',
+        '<meta name="ml4t-version" content="wrong">',
+    )
+    index.write_text(html, encoding="utf-8")
+    with pytest.raises(RuntimeError, match="ml4t-version is 'wrong'"):
+        verify_docs_deployment.verify_site(tmp_path, expected)
 
 
 def test_release_workflow_reuses_one_commit_bound_candidate() -> None:

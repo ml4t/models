@@ -127,7 +127,14 @@ jobs:
         run: uv sync --locked --dev --extra docs --python "${{ steps.setup-python.outputs.python-path }}"
 
       - name: Build docs
-        run: uv run mkdocs build --strict
+        env:
+          ML4T_DOCS_COMMIT: ${{ github.sha }}
+        run: |
+          export ML4T_DOCS_VERSION="$(uv run python -c 'from ml4t.models import __version__; print(__version__)')"
+          uv run mkdocs build --strict
+          ML4T_DOCS_SITE=site RELEASE_COMMIT="$ML4T_DOCS_COMMIT" \
+            RELEASE_VERSION="$ML4T_DOCS_VERSION" \
+            uv run python scripts/ci/verify_docs_deployment.py
 
   build-candidate:
     name: Build Candidate
