@@ -128,9 +128,9 @@ def test_candidate_distributions_expose_canonical_project_metadata(candidate_dir
         assert metadata["Summary"] == (
             "Finance-specific models for asset pricing, prediction, and portfolio learning"
         )
-        assert "Documentation, https://ml4trading.io/docs/models/" in metadata.get_all(
-            "Project-URL", []
-        )
+        project_urls = metadata.get_all("Project-URL", [])
+        assert "Homepage, https://www.ml4trading.io/" in project_urls
+        assert "Documentation, https://www.ml4trading.io/docs/models/" in project_urls
 
 
 def _performance_inputs(tmp_path: Path) -> tuple[list[Path], list[Path]]:
