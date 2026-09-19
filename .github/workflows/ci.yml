@@ -130,7 +130,8 @@ jobs:
         env:
           ML4T_DOCS_COMMIT: ${{ github.sha }}
         run: |
-          export ML4T_DOCS_VERSION="$(uv run python -c 'from ml4t.models import __version__; print(__version__)')"
+          ML4T_DOCS_VERSION="$(uv run python -c 'from ml4t.models import __version__; print(__version__)')"
+          export ML4T_DOCS_VERSION
           uv run mkdocs build --strict
           ML4T_DOCS_SITE=site RELEASE_COMMIT="$ML4T_DOCS_COMMIT" \
             RELEASE_VERSION="$ML4T_DOCS_VERSION" \
