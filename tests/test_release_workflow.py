@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -224,9 +225,31 @@ def test_only_release_workflow_can_deploy_documentation() -> None:
 
 
 def test_ci_uses_locked_dependencies_and_requires_cuda_for_releases() -> None:
-    workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-    assert 'version: "latest"' not in workflow
-    assert "uv sync --dev" not in workflow
-    assert "uv sync --frozen --dev" in workflow
-    assert "inputs.release_version != ''" in workflow
-    assert 'test "$CUDA_RESULT" = success' in workflow
+    workflows = [
+        (ROOT / ".github" / "workflows" / name).read_text(encoding="utf-8")
+        for name in ("ci.yml", "release.yml")
+    ]
+    ci = workflows[0]
+    assert 'version: "latest"' not in ci
+    assert 'UV_NO_SOURCES: "1"' in ci
+    for workflow in workflows:
+        sync_commands = [line for line in workflow.splitlines() if "uv sync" in line]
+        assert sync_commands
+        assert all("--locked" in command for command in sync_commands)
+        assert all("--frozen" not in command for command in sync_commands)
+    assert "inputs.release_version != ''" in ci
+    assert 'test "$CUDA_RESULT" = success' in ci
+
+
+def test_uv_locked_sync_supports_the_no_sources_policy() -> None:
+    environment = {**os.environ, "UV_NO_SOURCES": "1"}
+    result = subprocess.run(
+        ["uv", "sync", "--locked", "--dev", "--dry-run"],
+        cwd=ROOT,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr

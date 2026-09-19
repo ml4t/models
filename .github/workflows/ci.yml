@@ -42,7 +42,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
-        run: uv sync --frozen --dev --python "${{ steps.setup-python.outputs.python-path }}"
+        run: uv sync --locked --dev --python "${{ steps.setup-python.outputs.python-path }}"
 
       - name: Run Ruff check
         run: uv run ruff check src/ tests/ examples/ scripts/
@@ -68,7 +68,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
-        run: uv sync --frozen --dev --python "${{ steps.setup-python.outputs.python-path }}"
+        run: uv sync --locked --dev --python "${{ steps.setup-python.outputs.python-path }}"
 
       - name: Run ty check
         run: uv run ty check
@@ -98,7 +98,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
-        run: uv sync --frozen --dev --python "${{ steps.setup-python.outputs.python-path }}"
+        run: uv sync --locked --dev --python "${{ steps.setup-python.outputs.python-path }}"
 
       - name: Measure coverage
         run: uv run pytest tests/ -q --cov-report=json:coverage.json
@@ -124,7 +124,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
-        run: uv sync --frozen --dev --extra docs --python "${{ steps.setup-python.outputs.python-path }}"
+        run: uv sync --locked --dev --extra docs --python "${{ steps.setup-python.outputs.python-path }}"
 
       - name: Build docs
         run: uv run mkdocs build --strict
@@ -150,7 +150,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install build checks
-        run: uv sync --frozen --dev --python "${{ steps.setup-python.outputs.python-path }}"
+        run: uv sync --locked --dev --python "${{ steps.setup-python.outputs.python-path }}"
 
       - name: Build candidate
         run: uv build --out-dir candidate/dist
@@ -218,7 +218,7 @@ jobs:
           --expected-commit "${{ github.sha }}"
 
       - name: Install development environment
-        run: uv sync --frozen --dev --python "${{ steps.setup-python.outputs.python-path }}"
+        run: uv sync --locked --dev --python "${{ steps.setup-python.outputs.python-path }}"
 
       - name: Run source tests
         run: uv run pytest tests/ -q --tb=short
@@ -272,7 +272,7 @@ jobs:
 
       - name: Audit current contributor environment
         run: |
-          uv sync --frozen --dev --extra docs --python "${{ steps.setup-python.outputs.python-path }}"
+          uv sync --locked --dev --extra docs --python "${{ steps.setup-python.outputs.python-path }}"
           uv run --with pip-audit --with 'setuptools>=83.0.0' python -m pip_audit \
             --progress-spinner off
 

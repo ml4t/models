@@ -149,7 +149,7 @@ jobs:
           ML4T_DOCS_COMMIT: ${{ needs.validate.outputs.commit }}
           ML4T_DOCS_VERSION: ${{ needs.validate.outputs.version }}
         run: |
-          uv sync --frozen --dev --extra docs --python 3.12
+          uv sync --locked --dev --extra docs --python 3.12
           uv run mkdocs build --strict
           python - <<'PY'
           import json
