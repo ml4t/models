@@ -257,8 +257,8 @@ def test_standalone_docs_workflow_is_read_only_and_verifies_strict_build() -> No
     build = workflow["jobs"]["build"]
     commands = "\n".join(step.get("run", "") for step in build["steps"])
 
-    assert workflow["permissions"] == {}
-    assert build["permissions"] == {"contents": "read"}
+    assert workflow["permissions"] == {"contents": "read"}
+    assert "permissions" not in build
     assert "uv run mkdocs build --strict" in commands
     assert "ML4T_DOCS_SITE=site" in commands
     assert "scripts/ci/verify_docs_deployment.py" in commands
