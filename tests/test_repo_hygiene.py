@@ -51,7 +51,7 @@ def test_workflow_actions_are_pinned_to_commits() -> None:
         line.strip()
         for workflow in workflows
         for line in workflow.read_text(encoding="utf-8").splitlines()
-        if "uses:" in line
+        if "uses:" in line and "uses: ./" not in line
     ]
 
     assert action_references
@@ -140,14 +140,14 @@ def test_release_promotes_qualified_candidate_without_rebuilding() -> None:
     verifier = (root / "scripts/ci/verify_docs_deployment.py").read_text(encoding="utf-8")
 
     assert "uv build" not in workflow
-    assert "--workflow ci.yml" in workflow
-    assert '--expected-tag "${{ github.ref_name }}"' in workflow
+    assert "uses: ./.github/workflows/ci.yml" in workflow
+    assert '--expected-tag "v${{ needs.validate.outputs.version }}"' in workflow
     assert "packages-dir: candidate/dist/" in workflow
     assert "name: Publish Qualified Documentation" in workflow
-    assert "DOCS_DEPLOY_KEY is required for a stable release" in workflow
+    assert 'run: test -n "$DOCS_DEPLOY_KEY"' in workflow
     assert "scripts/ci/verify_docs_deployment.py" in workflow
-    assert "https://ml4trading.io/docs/models/release.json" in verifier
-    assert "needs: [ecosystem-qualification, select-candidate, docs]" in workflow
+    assert "https://www.ml4trading.io/docs/models/release.json" in verifier
+    assert "needs: [validate, ecosystem-qualification, select-candidate, docs]" in workflow
     assert '--repo "${{ github.repository }}"' in workflow
 
 

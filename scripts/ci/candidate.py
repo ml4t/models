@@ -5,6 +5,7 @@ import hashlib
 import json
 import tarfile
 import zipfile
+from email.message import Message
 from email.parser import BytesParser
 from pathlib import Path
 from typing import Any
@@ -31,22 +32,25 @@ def _distribution_files(candidate_dir: Path) -> tuple[Path, Path]:
     return wheels[0], sdists[0]
 
 
-def _wheel_identity(wheel: Path) -> tuple[str, str]:
+def _wheel_metadata(wheel: Path) -> Message:
     with zipfile.ZipFile(wheel) as archive:
         metadata_names = [
             name for name in archive.namelist() if name.endswith(".dist-info/METADATA")
         ]
         if len(metadata_names) != 1:
             raise ValueError(f"wheel must contain one METADATA file: {wheel}")
-        metadata = BytesParser().parsebytes(archive.read(metadata_names[0]))
+        return BytesParser().parsebytes(archive.read(metadata_names[0]))
+
+
+def _identity(metadata: Message, path: Path) -> tuple[str, str]:
     name = metadata.get("Name")
     version = metadata.get("Version")
     if not name or not version:
-        raise ValueError(f"wheel metadata is missing Name or Version: {wheel}")
+        raise ValueError(f"distribution metadata is missing Name or Version: {path}")
     return name, version
 
 
-def _sdist_identity(sdist: Path) -> tuple[str, str]:
+def _sdist_metadata(sdist: Path) -> Message:
     with tarfile.open(sdist, "r:gz") as archive:
         metadata_members = [
             member
@@ -58,12 +62,26 @@ def _sdist_identity(sdist: Path) -> tuple[str, str]:
         stream = archive.extractfile(metadata_members[0])
         if stream is None:
             raise ValueError(f"cannot read sdist metadata: {sdist}")
-        metadata = BytesParser().parsebytes(stream.read())
-    name = metadata.get("Name")
-    version = metadata.get("Version")
-    if not name or not version:
-        raise ValueError(f"sdist metadata is missing Name or Version: {sdist}")
-    return name, version
+        return BytesParser().parsebytes(stream.read())
+
+
+def _public_metadata(metadata: Message) -> dict[str, Any]:
+    project_urls = {}
+    for value in metadata.get_all("Project-URL", []):
+        label, url = value.split(",", maxsplit=1)
+        project_urls[label.strip()] = url.strip()
+    return {
+        "author_email": metadata.get("Author-email"),
+        "classifiers": sorted(metadata.get_all("Classifier", [])),
+        "description": metadata.get("Summary"),
+        "keywords": sorted(
+            keyword.strip() for keyword in (metadata.get("Keywords") or "").split(",") if keyword
+        ),
+        "license": metadata.get("License-Expression") or metadata.get("License"),
+        "maintainer_email": metadata.get("Maintainer-email"),
+        "project_urls": project_urls,
+        "requires_python": metadata.get("Requires-Python"),
+    }
 
 
 def _artifact_record(path: Path) -> dict[str, str | int]:
@@ -72,19 +90,25 @@ def _artifact_record(path: Path) -> dict[str, str | int]:
 
 def create(candidate_dir: Path, commit_sha: str, git_tree: str) -> None:
     wheel, sdist = _distribution_files(candidate_dir)
-    wheel_identity = _wheel_identity(wheel)
-    sdist_identity = _sdist_identity(sdist)
+    wheel_metadata = _wheel_metadata(wheel)
+    sdist_metadata = _sdist_metadata(sdist)
+    wheel_identity = _identity(wheel_metadata, wheel)
+    sdist_identity = _identity(sdist_metadata, sdist)
     if wheel_identity != sdist_identity:
         raise ValueError(
             f"wheel identity {wheel_identity!r} does not match sdist identity {sdist_identity!r}"
         )
     name, version = wheel_identity
+    public_metadata = _public_metadata(wheel_metadata)
+    if public_metadata != _public_metadata(sdist_metadata):
+        raise ValueError("wheel and sdist public metadata do not match")
     manifest = {
         "schema_version": SCHEMA_VERSION,
         "commit_sha": commit_sha,
         "git_tree": git_tree,
         "name": name,
         "version": version,
+        "metadata": public_metadata,
         "artifacts": [_artifact_record(wheel), _artifact_record(sdist)],
     }
     (candidate_dir / "candidate.json").write_text(
@@ -132,11 +156,18 @@ def verify(
         if record.get("sha256") != _sha256(path) or record.get("size") != path.stat().st_size:
             raise ValueError(f"candidate artifact integrity check failed: {filename}")
 
-    identity = _wheel_identity(wheel)
-    if identity != _sdist_identity(sdist):
+    wheel_metadata = _wheel_metadata(wheel)
+    sdist_metadata = _sdist_metadata(sdist)
+    identity = _identity(wheel_metadata, wheel)
+    if identity != _identity(sdist_metadata, sdist):
         raise ValueError("candidate wheel and sdist identities do not match")
     if identity != (manifest.get("name"), manifest.get("version")):
         raise ValueError("candidate metadata does not match the manifest")
+    public_metadata = _public_metadata(wheel_metadata)
+    if public_metadata != _public_metadata(sdist_metadata):
+        raise ValueError("candidate wheel and sdist public metadata do not match")
+    if public_metadata != manifest.get("metadata"):
+        raise ValueError("candidate public metadata does not match the manifest")
 
 
 def compare_wheel(

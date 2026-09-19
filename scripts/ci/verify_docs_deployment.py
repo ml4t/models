@@ -26,8 +26,8 @@ def verify(
     urls: tuple[str, ...],
     expected: dict[str, str],
     *,
-    attempts: int = 20,
-    retry_seconds: float = 15,
+    attempts: int = 24,
+    retry_seconds: float = 10,
 ) -> None:
     if attempts < 1:
         raise ValueError("attempts must be positive")
@@ -55,12 +55,13 @@ def verify(
 def main() -> None:
     expected = {
         "commit": os.environ["RELEASE_COMMIT"],
+        "library": "models",
         "version": os.environ["RELEASE_VERSION"],
     }
     verify(
         (
-            "https://ml4trading.io/docs/models/release.json",
-            f"https://ml4trading.io/docs/models/releases/{expected['version']}/release.json",
+            "https://www.ml4trading.io/docs/models/release.json",
+            f"https://www.ml4trading.io/docs/models/releases/{expected['version']}/release.json",
         ),
         expected,
     )

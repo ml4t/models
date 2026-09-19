@@ -27,7 +27,7 @@ include = [
 [project]
 name = "ml4t-models"
 dynamic = ["version"]
-description = "Finance-specific models for asset pricing, prediction, and portfolio learning"
+description = "Finance-specific models for asset pricing, prediction, and portfolio learning."
 readme = "README.md"
 license = { text = "MIT" }
 authors = [

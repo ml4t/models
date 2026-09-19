@@ -16,6 +16,15 @@ CORE_TESTS = (
     "test_types.py",
 )
 
+REPOSITORY_ONLY_TESTS = frozenset(
+    {
+        "test_coverage_gate.py",
+        "test_release_candidate.py",
+        "test_release_workflow.py",
+        "test_repo_hygiene.py",
+    }
+)
+
 DOCUMENTATION_TEST_INPUTS = (
     Path("README.md"),
     Path("docs/getting-started/quickstart.md"),
@@ -46,6 +55,17 @@ def _new_venv(root: Path, name: str, python_version: str) -> Path:
     venv = root / name
     _run(["uv", "venv", str(venv), "--python", python_version])
     return _python_executable(venv)
+
+
+def _installed_test_paths(root: Path, mode: str) -> list[str]:
+    tests = root / "tests"
+    if mode == "core":
+        return [str(tests / name) for name in CORE_TESTS]
+    return [
+        str(path)
+        for path in sorted(tests.glob("test_*.py"))
+        if path.name not in REPOSITORY_ONLY_TESTS
+    ]
 
 
 def _core_smoke(python: Path) -> None:
@@ -151,26 +171,13 @@ def test_wheel(candidate_dir: Path, python_version: str, mode: str) -> None:
             destination = root / source
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, destination)
-        if mode == "full":
-            selected_tests = [str(root / "tests")]
-            ignored = [
-                "--ignore",
-                str(root / "tests" / "test_release_candidate.py"),
-                "--ignore",
-                str(root / "tests" / "test_repo_hygiene.py"),
-                "--ignore",
-                str(root / "tests" / "test_coverage_gate.py"),
-            ]
-        else:
-            selected_tests = [str(root / "tests" / name) for name in CORE_TESTS]
-            ignored = []
+        selected_tests = _installed_test_paths(root, mode)
         _run(
             [
                 str(test_python),
                 "-m",
                 "pytest",
                 *selected_tests,
-                *ignored,
                 "-q",
                 "--tb=short",
             ],
