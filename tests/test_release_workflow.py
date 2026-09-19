@@ -10,7 +10,7 @@ import pytest
 import yaml
 
 from ml4t.models import __version__
-from scripts.ci import readme_smoke, release
+from scripts.ci import readme_smoke, release, verify_docs_deployment
 
 ROOT = Path(__file__).parents[1]
 COMMIT = "a" * 40
@@ -151,6 +151,26 @@ def test_readme_quick_start_is_an_executable_installed_package_contract() -> Non
     source = readme_smoke.extract_quick_start(readme.read_text(encoding="utf-8"))
     assert "IPCAModel" in source
     readme_smoke.run(readme, __version__)
+
+
+def test_deployed_docs_default_retry_window_is_four_minutes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    attempts: list[int] = []
+    sleeps: list[float] = []
+
+    def read_identity(_url: str, _commit: str, attempt: int) -> object:
+        attempts.append(attempt)
+        return {"commit": "stale"}
+
+    monkeypatch.setattr(verify_docs_deployment, "_read_identity", read_identity)
+    monkeypatch.setattr(verify_docs_deployment.time, "sleep", sleeps.append)
+
+    with pytest.raises(RuntimeError, match="deployed documentation identity did not match"):
+        verify_docs_deployment.verify(("https://example.test/release.json",), {"commit": COMMIT})
+
+    assert attempts == list(range(24))
+    assert sleeps == [10] * 23
 
 
 def test_release_workflow_reuses_one_commit_bound_candidate() -> None:
