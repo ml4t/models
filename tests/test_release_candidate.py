@@ -256,6 +256,20 @@ def test_installed_typecheck_targets_candidate_environment(
     ]
 
 
+def test_installed_wheel_suite_excludes_repository_only_tests(tmp_path: Path) -> None:
+    tests = tmp_path / "tests"
+    tests.mkdir()
+    package_test = tests / "test_types.py"
+    package_test.touch()
+    for name in test_wheel.REPOSITORY_ONLY_TESTS:
+        (tests / name).touch()
+
+    selected = test_wheel._installed_test_paths(tmp_path, "full")
+
+    assert selected == [str(package_test)]
+    assert "test_release_workflow.py" in test_wheel.REPOSITORY_ONLY_TESTS
+
+
 def test_hardware_qualification_separates_replay_and_cpu_recovery_tolerances() -> None:
     expected = np.zeros(1)
     cross_backend = np.full(1, 2e-5)
