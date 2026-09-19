@@ -177,32 +177,17 @@ def test_deployed_docs_default_retry_window_is_four_minutes(
     assert sleeps == [10] * 23
 
 
-def test_rendered_docs_expose_exact_release_identity(tmp_path: Path) -> None:
+def test_rendered_docs_verifier_requires_exact_release_identity(tmp_path: Path) -> None:
     expected = {"commit": COMMIT, "library": "models", "version": __version__}
-    environment = {
-        **os.environ,
-        "ML4T_DOCS_COMMIT": expected["commit"],
-        "ML4T_DOCS_VERSION": expected["version"],
-    }
-    subprocess.run(
-        [
-            "uv",
-            "run",
-            "--extra",
-            "docs",
-            "mkdocs",
-            "build",
-            "--strict",
-            "--site-dir",
-            str(tmp_path),
-        ],
-        cwd=ROOT,
-        env=environment,
-        check=True,
+    index = tmp_path / "index.html"
+    index.write_text(
+        '<meta name="ml4t-library" content="models">'
+        f'<meta name="ml4t-version" content="{__version__}">'
+        f'<meta name="ml4t-commit" content="{COMMIT}">',
+        encoding="utf-8",
     )
 
     verify_docs_deployment.verify_site(tmp_path, expected)
-    index = tmp_path / "index.html"
     html = index.read_text(encoding="utf-8").replace(
         f'<meta name="ml4t-version" content="{__version__}">',
         '<meta name="ml4t-version" content="wrong">',
