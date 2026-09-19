@@ -246,10 +246,22 @@ def test_release_workflow_reuses_one_commit_bound_candidate() -> None:
 
 
 def test_only_release_workflow_can_deploy_documentation() -> None:
-    for name in ("ci.yml", "ecosystem.yml"):
+    for name in ("ci.yml", "docs.yml", "ecosystem.yml"):
         assert "push-to-another-repository" not in (
             ROOT / ".github" / "workflows" / name
         ).read_text(encoding="utf-8")
+
+
+def test_standalone_docs_workflow_is_read_only_and_verifies_strict_build() -> None:
+    workflow = _workflow("docs.yml")
+    build = workflow["jobs"]["build"]
+    commands = "\n".join(step.get("run", "") for step in build["steps"])
+
+    assert workflow["permissions"] == {}
+    assert build["permissions"] == {"contents": "read"}
+    assert "uv run mkdocs build --strict" in commands
+    assert "ML4T_DOCS_SITE=site" in commands
+    assert "scripts/ci/verify_docs_deployment.py" in commands
 
 
 def test_ci_uses_locked_dependencies_and_requires_cuda_for_releases() -> None:
