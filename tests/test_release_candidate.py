@@ -4,6 +4,7 @@ import json
 import subprocess
 import tarfile
 import zipfile
+from email.parser import BytesParser
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -101,6 +102,35 @@ def test_candidate_contains_typing_and_documentation_contracts(candidate_dir: Pa
     assert "SECURITY.md" in sdist_members
     assert "mkdocs.yml" in sdist_members
     assert "docs/getting-started/installation.md" in sdist_members
+
+
+def test_candidate_distributions_expose_canonical_project_metadata(candidate_dir: Path) -> None:
+    wheel, sdist = candidate._distribution_files(candidate_dir)
+    with zipfile.ZipFile(wheel) as archive:
+        metadata_name = next(
+            name for name in archive.namelist() if name.endswith(".dist-info/METADATA")
+        )
+        wheel_metadata = BytesParser().parsebytes(archive.read(metadata_name))
+
+    with tarfile.open(sdist, "r:gz") as archive:
+        metadata_member = next(
+            member
+            for member in archive.getmembers()
+            if member.name.count("/") == 1 and member.name.endswith("/PKG-INFO")
+        )
+        stream = archive.extractfile(metadata_member)
+        assert stream is not None
+        sdist_metadata = BytesParser().parsebytes(stream.read())
+
+    for metadata in (wheel_metadata, sdist_metadata):
+        assert metadata["Author-email"] == "Stefan Jansen <stefan@applied-ai.com>"
+        assert metadata["Maintainer-email"] == "Stefan Jansen <pm@ml4trading.io>"
+        assert metadata["Summary"] == (
+            "Finance-specific models for asset pricing, prediction, and portfolio learning"
+        )
+        assert "Documentation, https://ml4trading.io/docs/models/" in metadata.get_all(
+            "Project-URL", []
+        )
 
 
 def _performance_inputs(tmp_path: Path) -> tuple[list[Path], list[Path]]:
