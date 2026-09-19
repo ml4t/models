@@ -128,7 +128,7 @@ def test_candidate_distributions_expose_canonical_project_metadata(candidate_dir
         assert metadata["Author-email"] == "Stefan Jansen <stefan@applied-ai.com>"
         assert metadata["Maintainer-email"] == "Stefan Jansen <pm@ml4trading.io>"
         assert metadata["Summary"] == (
-            "Finance-specific models for asset pricing, prediction, and portfolio learning"
+            "Finance-specific models for asset pricing, prediction, and portfolio learning."
         )
         project_urls = metadata.get_all("Project-URL", [])
         assert "Homepage, https://www.ml4trading.io/" in project_urls

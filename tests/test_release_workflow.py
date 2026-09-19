@@ -65,7 +65,7 @@ def test_pypi_publication_must_match_candidate_metadata_and_bytes(
     metadata = {
         "author_email": "Stefan Jansen <stefan@applied-ai.com>",
         "classifiers": ["Programming Language :: Python :: 3"],
-        "description": "Models",
+        "description": "Finance-specific models for asset pricing, prediction, and portfolio learning.",
         "keywords": ["finance"],
         "license": "MIT",
         "maintainer_email": "Stefan Jansen <pm@ml4trading.io>",
