@@ -169,6 +169,9 @@ jobs:
               encoding="utf-8",
           )
           PY
+          ML4T_DOCS_SITE=site RELEASE_COMMIT="$ML4T_DOCS_COMMIT" \
+            RELEASE_VERSION="$ML4T_DOCS_VERSION" \
+            uv run python scripts/ci/verify_docs_deployment.py
 
       - name: Require deploy credentials
         env:

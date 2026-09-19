@@ -168,10 +168,33 @@ def test_deployed_docs_default_retry_window_is_four_minutes(
     monkeypatch.setattr(verify_docs_deployment.time, "sleep", sleeps.append)
 
     with pytest.raises(RuntimeError, match="deployed documentation identity did not match"):
-        verify_docs_deployment.verify(("https://example.test/release.json",), {"commit": COMMIT})
+        verify_docs_deployment.verify(
+            ("https://example.test/release.json",),
+            {"commit": COMMIT},
+        )
 
     assert attempts == list(range(24))
     assert sleeps == [10] * 23
+
+
+def test_rendered_docs_verifier_requires_exact_release_identity(tmp_path: Path) -> None:
+    expected = {"commit": COMMIT, "library": "models", "version": __version__}
+    index = tmp_path / "index.html"
+    index.write_text(
+        '<meta name="ml4t-library" content="models">'
+        f'<meta name="ml4t-version" content="{__version__}">'
+        f'<meta name="ml4t-commit" content="{COMMIT}">',
+        encoding="utf-8",
+    )
+
+    verify_docs_deployment.verify_site(tmp_path, expected)
+    html = index.read_text(encoding="utf-8").replace(
+        f'<meta name="ml4t-version" content="{__version__}">',
+        '<meta name="ml4t-version" content="wrong">',
+    )
+    index.write_text(html, encoding="utf-8")
+    with pytest.raises(RuntimeError, match="ml4t-version is 'wrong'"):
+        verify_docs_deployment.verify_site(tmp_path, expected)
 
 
 def test_release_workflow_reuses_one_commit_bound_candidate() -> None:
@@ -218,10 +241,22 @@ def test_release_workflow_reuses_one_commit_bound_candidate() -> None:
 
 
 def test_only_release_workflow_can_deploy_documentation() -> None:
-    for name in ("ci.yml", "ecosystem.yml"):
+    for name in ("ci.yml", "docs.yml", "ecosystem.yml"):
         assert "push-to-another-repository" not in (
             ROOT / ".github" / "workflows" / name
         ).read_text(encoding="utf-8")
+
+
+def test_standalone_docs_workflow_is_read_only_and_verifies_strict_build() -> None:
+    workflow = _workflow("docs.yml")
+    build = workflow["jobs"]["build"]
+    commands = "\n".join(step.get("run", "") for step in build["steps"])
+
+    assert workflow["permissions"] == {"contents": "read"}
+    assert "permissions" not in build
+    assert "uv run mkdocs build --strict" in commands
+    assert "ML4T_DOCS_SITE=site" in commands
+    assert "scripts/ci/verify_docs_deployment.py" in commands
 
 
 def test_ci_uses_locked_dependencies_and_requires_cuda_for_releases() -> None:
