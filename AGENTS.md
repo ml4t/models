@@ -39,6 +39,12 @@ Polars and `ml4t-specs` integrations require the `integration` extra.
 - Record model-family assumptions in the relevant reference page and test financial invariants, not
   only array shapes.
 
+## Guide maintenance
+
+Update this guide when a public model family, integration boundary, optional dependency, hardware
+qualification path, documentation authority, or quality command changes. Keep research drafts,
+current issue state, and private paper copies out of public guides.
+
 ## Quality commands
 
 ```bash
