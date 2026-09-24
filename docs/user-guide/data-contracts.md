@@ -1,5 +1,16 @@
 # Data Contracts
 
+## Verify identities before fitting
+
+Run the [long-frame adapter example](https://github.com/ml4t/models/blob/main/examples/integration_handoff.py)
+with the base install. It checks a two-date, two-asset `PersistentPanelBatch` and preserves
+`("A", "B")` as the asset order. With your own frame, check that each date and asset has at most
+one row, inspect missing values, and confirm that returns are aligned with the features used to
+predict them. See the [typed contracts](../api/index.md#typed-contracts) and
+[integration API](../api/index.md#integration) for exact options. The
+[Book Guide](../book-guide/index.md) maps method notebooks; it has no exact notebook for these
+batch constructors.
+
 The library uses three primary batch contracts because the underlying finance problems are not all the same.
 
 ## PersistentPanelBatch

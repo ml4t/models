@@ -1,5 +1,19 @@
 # Integration
 
+## Run and verify a handoff
+
+The [CPU adapter example](https://github.com/ml4t/models/blob/main/examples/integration_handoff.py)
+creates a two-date panel and converts a future `AssetForecastResult` into two prediction rows.
+Check `timestamp`, `asset`, and `prediction_value` before passing the frame downstream.
+Parquet writing and Specs objects need `ml4t-models[integration]`; `ml4t-backtest` and
+`ml4t-diagnostic` are separate packages. A frame conversion alone does not run a backtest or
+compute IC. Exact signatures are in the [integration API](../api/index.md#integration).
+
+The book's [case-study library bridge](https://github.com/stefan-jansen/machine-learning-for-trading/blob/d2edec54b1c7a6a9d7a97d8129eb05db4491e1eb/case_studies/utils/latent_factors/library_bridge.py)
+calls `ml4t.models` with case-study data and registry requirements. The
+[case-study insights notebook](https://github.com/stefan-jansen/machine-learning-for-trading/blob/d2edec54b1c7a6a9d7a97d8129eb05db4491e1eb/14_latent_factors/09_case_study_insights.ipynb)
+illustrates related analysis of stored results; it is not an API example for these adapters.
+
 `ml4t-models` integrates with the rest of the ML4T stack at boundaries. It does not try to absorb execution or evaluation logic.
 
 ## Boundary Design

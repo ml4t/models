@@ -1,5 +1,19 @@
 # Stochastic Discount Factor
 
+## Run and verify
+
+Install `ml4t-models[deep]`, then run the
+[bounded CPU SDF example](https://github.com/ml4t/models/blob/main/examples/stochastic_discount_factor.py).
+It uses six dated cross-sections with observed returns, checks an `(6, 5)` weight matrix, and
+checks the optional return projection. It uses only a few training epochs as a contract smoke
+check; that is not enough for a research result. Use a separate validation period and explicit
+checkpoints for longer training. The [API reference](../api/index.md) has exact configuration and
+state signatures.
+
+The [book's SDF notebook](https://github.com/stefan-jansen/machine-learning-for-trading/blob/d2edec54b1c7a6a9d7a97d8129eb05db4491e1eb/14_latent_factors/07_stochastic_discount_factor.ipynb)
+teaches the adversarial method manually and needs book data and longer PyTorch training. It does
+not call `StochasticDiscountFactorModel`.
+
 `StochasticDiscountFactorModel` is a separate model family because the native object is not
 a latent factor with a premium forecast. The native object is a weight-based pricing-kernel
 proxy.
