@@ -1,5 +1,18 @@
 # Direct Asset Prediction
 
+## Run and verify
+
+Install `ml4t-models[deep]` and run the
+[small CPU SAE example](https://github.com/ml4t/models/blob/main/examples/direct_asset_prediction.py).
+It checks that fitting converges and that the signal matrix has one value per date and asset.
+The two-epoch run verifies the contract, not predictive skill. Keep validation and test dates
+separate for a real study. The [API reference](../api/index.md) describes `SAEConfig`,
+`SAEModel`, and `AssetSignalResult`.
+
+The [supervised autoencoder notebook](https://github.com/stefan-jansen/machine-learning-for-trading/blob/d2edec54b1c7a6a9d7a97d8129eb05db4491e1eb/14_latent_factors/08_supervised_autoencoder.ipynb)
+teaches a manual implementation with book data and longer PyTorch training; it does not call
+`SAEModel`.
+
 This family covers models that predict asset-level signals directly rather than first
 estimating latent structure.
 

@@ -149,8 +149,6 @@ def test_published_install_verification_retries_index_propagation(
 
 def test_readme_quick_start_is_an_executable_installed_package_contract() -> None:
     readme = ROOT / "README.md"
-    source = readme_smoke.extract_quick_start(readme.read_text(encoding="utf-8"))
-    assert "IPCAModel" in source
     readme_smoke.run(readme, __version__)
 
 

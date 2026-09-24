@@ -1,7 +1,6 @@
 # API Stability
 
-This page defines the public surface that is intended to be stable for the
-`0.1` beta series.
+This page defines the public surface for the `0.1` stable line.
 
 ## Stable Import Surface
 
@@ -20,7 +19,7 @@ and integration helpers used throughout the documentation.
 
 ## Stable Families
 
-The beta API is organized around four model families:
+The public API is organized around four model families:
 
 | Family | Stable models |
 |---|---|
@@ -67,6 +66,6 @@ contracts before introducing a new public type.
 
 ## Deferred Surface
 
-The beta release does not freeze internals under `ml4t.models._internal`.
+Stable releases do not freeze internals under `ml4t.models._internal`.
 Functions and modules prefixed with `_` are implementation details and may change
 between `0.1` releases.

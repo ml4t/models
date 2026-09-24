@@ -1,6 +1,6 @@
 # ML4T Models
 
-Build finance-native latent-factor, stochastic discount factor, direct signal, and portfolio-learning models without collapsing everything into one generic trainer.
+Finance-specific models for asset pricing, prediction, and portfolio learning.
 
 `ml4t.models` is the modeling layer in the ML4T stack. It packages model families that matter in empirical asset pricing and portfolio construction while keeping the contracts explicit:
 
@@ -8,7 +8,10 @@ Build finance-native latent-factor, stochastic discount factor, direct signal, a
 - what object it estimates
 - what must still happen before you have an implementable forecast or tradable weight vector
 
-If you are new to the library, start with the [Quickstart](getting-started/quickstart.md). If you are coming from *Machine Learning for Trading*, the [Book Guide](book-guide/index.md) maps the chapter implementations to the production API.
+Start with the [bounded CPU Quickstart](getting-started/quickstart.md) for a complete forecast and
+expected result. Use the [task guides](user-guide/index.md) for your own inputs,
+the [API Reference](api/index.md) for exact signatures, and the [Book Guide](book-guide/index.md)
+for verified public teaching notebooks.
 
 <div class="grid cards" markdown>
 
@@ -62,37 +65,10 @@ Many finance models look similar at the tensor level but behave very differently
 
 The library reflects those differences instead of hiding them behind one catch-all `fit/predict` story.
 
-## Quick Example
+## First result
 
-```python
-import numpy as np
-
-from ml4t.models import (
-    BetaLambdaMapper,
-    CrossSectionBatch,
-    ExpandingMeanFactorForecaster,
-    IPCAConfig,
-    IPCAModel,
-    LatentFactorForecastPipeline,
-)
-
-batch = CrossSectionBatch(
-    characteristics=np.random.randn(24, 150, 10),
-    returns=np.random.randn(24, 150),
-    timestamps=tuple(range(24)),
-)
-
-pipeline = LatentFactorForecastPipeline(
-    model=IPCAModel(IPCAConfig(n_factors=3)),
-    forecaster=ExpandingMeanFactorForecaster(),
-    mapper=BetaLambdaMapper(),
-)
-pipeline.fit(batch)
-prediction = pipeline.predict(batch)
-
-print(prediction.state.asset_betas.shape)
-print(prediction.asset_forecast.expected_returns.shape)
-```
+The [Quickstart](getting-started/quickstart.md) runs PCA on a small synthetic panel and checks a
+finite forecast with shape `(2, 6)`. It needs only the base package and NumPy.
 
 ## Three Core Contracts
 

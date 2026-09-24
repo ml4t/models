@@ -385,6 +385,18 @@ body {
 /* ── Responsive ────────────────────────────────────── */
 
 @media screen and (max-width: 76.1875em) {
+  .md-header {
+    border-bottom: 1px solid var(--ml4t-silver-muted);
+    color: var(--ml4t-navy);
+  }
+
+  .md-header__inner {
+    display: flex;
+    height: 2.4rem;
+    padding: 0 0.8rem;
+    overflow: visible;
+  }
+
   .md-content {
     max-width: 100%;
   }

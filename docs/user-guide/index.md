@@ -92,6 +92,15 @@ These models optimize allocation decisions directly rather than first estimating
 - Evaluation belongs in `ml4t-diagnostic`, not in this library.
 - Execution belongs in `ml4t-backtest`, not in this library.
 
+## Supported and unsupported boundaries
+
+The four model families above are supported public workflows. No other model family is designated
+experimental in the public API. Modules under `ml4t.models._internal` can change between releases;
+use the [public API reference](../api/index.md) for supported imports. This package does not fetch
+market data, compute diagnostic scores, or simulate trades. The [Integration guide](integration.md)
+describes the frames it can hand to those other steps. Neural models require the `deep` extra;
+their small CPU examples verify contracts, not trained investment performance.
+
 ## A Good Reading Strategy
 
 If you want the economic logic first:
