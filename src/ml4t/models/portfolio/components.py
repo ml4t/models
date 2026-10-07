@@ -239,16 +239,20 @@ class MacroGraphAttention(nn.Module):
         query = x.reshape(batch_size * n_periods, n_assets, d_model)
         key_padding_mask = mask.reshape(batch_size * n_periods, n_assets) < 0.5
         adjacency_mask = self.get_buffer("_adjacency_mask_buffer")
-        combined = adjacency_mask.unsqueeze(0) | key_padding_mask.unsqueeze(1)
-        all_blocked = combined.all(dim=-1)
-        if all_blocked.any():
-            key_padding_mask = key_padding_mask & ~all_blocked
-        attended, _ = self.attention(
-            query,
-            query,
-            query,
-            attn_mask=adjacency_mask,
-            key_padding_mask=key_padding_mask,
-        )
+        # True blocks attention. A query with no legal key makes softmax NaN,
+        # so fall back to self when that asset is present and otherwise allow
+        # a finite dummy attention that the caller mask zeros out.
+        blocked = adjacency_mask.unsqueeze(0) | key_padding_mask.unsqueeze(1)
+        fully_blocked = blocked.all(dim=-1)
+        if bool(fully_blocked.any()):
+            eye = torch.eye(n_assets, device=blocked.device, dtype=torch.bool)
+            allow_self = (
+                fully_blocked.unsqueeze(-1) & eye.unsqueeze(0) & (~key_padding_mask).unsqueeze(1)
+            )
+            blocked = blocked & ~allow_self
+            still_blocked = blocked.all(dim=-1)
+            if bool(still_blocked.any()):
+                blocked = blocked & ~still_blocked.unsqueeze(-1)
+        attended, _ = self.attention(query, query, query, attn_mask=blocked)
         attended = attended.reshape(batch_size, n_periods, n_assets, d_model)
         return self.layer_norm(x + self.dropout(attended))
