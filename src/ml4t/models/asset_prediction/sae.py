@@ -327,14 +327,27 @@ def _iterate_batches(
     seed: int,
 ):
     n_obs = int(features.shape[0])
+    if n_obs < 2:
+        raise ValueError(
+            "SAE training requires at least 2 valid observations; "
+            f"got {n_obs}. BatchNorm cannot update on a single row."
+        )
     if batch_size is None or batch_size <= 0 or batch_size >= n_obs:
         yield features, targets
         return
+    # BatchNorm1d rejects a one-row training batch. Keep the configured size
+    # when it is already safe, and fold a trailing singleton into the previous
+    # batch so every observation is still used.
+    step = max(int(batch_size), 2)
     generator = torch.Generator(device=features.device)
     generator.manual_seed(seed)
     order = torch.randperm(n_obs, generator=generator, device=features.device)
-    for start in range(0, n_obs, batch_size):
-        idx = order[start : start + batch_size]
+    starts = list(range(0, n_obs, step))
+    if len(starts) > 1 and n_obs - starts[-1] == 1:
+        starts.pop()
+    for index, start in enumerate(starts):
+        end = starts[index + 1] if index + 1 < len(starts) else n_obs
+        idx = order[start:end]
         yield features[idx], targets[idx]
 
 
