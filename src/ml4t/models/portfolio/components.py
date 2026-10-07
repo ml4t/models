@@ -179,18 +179,24 @@ class CrossSectionalAttention(nn.Module):
     def forward(self, x: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
         batch_size, n_periods, n_assets, d_model = x.shape
         if self.lag > 0:
-            pad = torch.zeros(
-                (batch_size, self.lag, n_assets, d_model),
-                device=x.device,
-                dtype=x.dtype,
-            )
-            kv = torch.cat([pad, x[:, : n_periods - self.lag]], dim=1)
-            pad_mask = torch.zeros(
-                (batch_size, self.lag, n_assets),
-                device=mask.device,
-                dtype=mask.dtype,
-            )
-            kv_mask = torch.cat([pad_mask, mask[:, : n_periods - self.lag]], dim=1)
+            history = n_periods - self.lag
+            if history <= 0:
+                # A negative slice would wrap to the end of the window.
+                kv = torch.zeros_like(x)
+                kv_mask = torch.zeros_like(mask)
+            else:
+                pad = torch.zeros(
+                    (batch_size, self.lag, n_assets, d_model),
+                    device=x.device,
+                    dtype=x.dtype,
+                )
+                kv = torch.cat([pad, x[:, :history]], dim=1)
+                pad_mask = torch.zeros(
+                    (batch_size, self.lag, n_assets),
+                    device=mask.device,
+                    dtype=mask.dtype,
+                )
+                kv_mask = torch.cat([pad_mask, mask[:, :history]], dim=1)
         else:
             kv = x
             kv_mask = mask

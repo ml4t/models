@@ -16,7 +16,7 @@ from ml4t.models.configs.portfolio import PortfolioConfig
 from ml4t.models.latent_factors.ipca import _normalize_theta_y
 from ml4t.models.latent_factors.rp_pca import _risk_premium_matrix
 from ml4t.models.portfolio import runtime as portfolio_runtime
-from ml4t.models.portfolio.components import MacroGraphAttention
+from ml4t.models.portfolio.components import CrossSectionalAttention, MacroGraphAttention
 from ml4t.models.portfolio.losses import compute_net_portfolio_returns, softmin_sharpe
 from ml4t.models.portfolio.postprocessors import (
     apply_turnover_limit,
@@ -328,6 +328,24 @@ def test_portfolio_best_checkpoint_contains_exact_evaluated_state(
     assert float(artifacts.checkpoint_states[1]["scale"].item()) == pytest.approx(
         evaluated_states[0]
     )
+
+
+def test_cross_attention_lag_longer_than_the_window_does_not_wrap() -> None:
+    torch.manual_seed(0)
+    window = torch.randn(1, 3, 2, 4)
+    mask = torch.ones(1, 3, 2)
+    matched = CrossSectionalAttention(d_model=4, n_heads=1, dropout=0.0, lag=3)
+    longer = CrossSectionalAttention(d_model=4, n_heads=1, dropout=0.0, lag=8)
+    longer.load_state_dict(matched.state_dict())
+    matched.eval()
+    longer.eval()
+
+    matched_output = matched(window, mask)
+    longer_output = longer(window, mask)
+
+    assert matched_output.shape == window.shape
+    assert torch.isfinite(longer_output).all()
+    torch.testing.assert_close(longer_output, matched_output)
 
 
 def test_graph_attention_stays_finite_when_a_node_has_no_neighbors() -> None:
