@@ -17,7 +17,10 @@ from ml4t.models.latent_factors.ipca import _normalize_theta_y
 from ml4t.models.latent_factors.rp_pca import _risk_premium_matrix
 from ml4t.models.portfolio import runtime as portfolio_runtime
 from ml4t.models.portfolio.losses import compute_net_portfolio_returns, softmin_sharpe
-from ml4t.models.portfolio.postprocessors import normalize_cross_sectional_weights
+from ml4t.models.portfolio.postprocessors import (
+    apply_turnover_limit,
+    normalize_cross_sectional_weights,
+)
 
 
 def test_rp_pca_default_matches_lettau_pelger_signal_matrix() -> None:
@@ -324,6 +327,33 @@ def test_portfolio_best_checkpoint_contains_exact_evaluated_state(
     assert float(artifacts.checkpoint_states[1]["scale"].item()) == pytest.approx(
         evaluated_states[0]
     )
+
+
+def test_zero_turnover_limit_holds_the_previous_book() -> None:
+    weights = np.array([[[0.4, -0.4], [0.2, -0.1]]], dtype=np.float64)
+    previous = np.array([[0.5, -0.5]], dtype=np.float64)
+
+    actual = apply_turnover_limit(
+        weights,
+        previous_weights=previous,
+        mask=np.ones_like(weights, dtype=bool),
+        turnover_limit=0.0,
+    )
+
+    np.testing.assert_allclose(actual[0, 0], previous[0])
+    np.testing.assert_allclose(actual[0, 1], previous[0])
+
+
+def test_negative_turnover_limit_is_rejected() -> None:
+    weights = np.ones((1, 1, 2), dtype=np.float64)
+
+    with pytest.raises(ValueError, match="turnover_limit"):
+        apply_turnover_limit(
+            weights,
+            previous_weights=np.zeros((1, 2)),
+            mask=np.ones_like(weights, dtype=bool),
+            turnover_limit=-0.1,
+        )
 
 
 def test_portfolio_constraints_are_satisfied_jointly() -> None:

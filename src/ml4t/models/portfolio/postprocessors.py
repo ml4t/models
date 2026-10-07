@@ -217,10 +217,11 @@ def apply_turnover_limit(
 ) -> np.ndarray:
     """Scale cross-sectional weight changes to satisfy an L1 turnover cap."""
 
+    if not np.isfinite(turnover_limit) or turnover_limit < 0.0:
+        raise ValueError(f"turnover_limit must be finite and non-negative; got {turnover_limit}")
+
     constrained = np.asarray(weights, dtype=np.float64).copy()
     batch_size, n_periods, _ = constrained.shape
-    if turnover_limit <= 0:
-        return np.zeros_like(constrained)
 
     previous = (
         np.asarray(previous_weights, dtype=np.float64).copy()
