@@ -11,6 +11,7 @@ import sys
 import tempfile
 import time
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -299,11 +300,14 @@ def _lstm(batch: PortfolioSequenceBatch, device: str) -> FitOnce:
 
 
 def _deep(batch: PortfolioSequenceBatch, device: str) -> FitOnce:
+    adjacency = np.zeros((batch.features.shape[2], batch.features.shape[2]), dtype=bool)
+    adjacency[0, :] = True
+    batch = replace(batch, adjacency_mask=adjacency)
     config = DeepPortfolioConfig(
         d_model=4,
         n_heads=1,
         cross_attention_heads=1,
-        macro_gnn_heads=1,
+        macro_gnn_heads=2,
         max_iters=1,
         eval_every=1,
         checkpoint_every=1,
