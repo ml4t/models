@@ -61,8 +61,10 @@ pip install ml4t-models[integration]  # polars + ml4t-specs bridges
 pip install ml4t-models[all]          # all runtime capabilities
 ```
 
-Supported stable interpreters are Python 3.12, 3.13, and 3.14. Python 3.15 prereleases run a
-separate compatibility gate and are not yet part of the stable support range.
+Supported interpreters for all model families are Python 3.12, 3.13, and 3.14.
+Python 3.15 is stable, but this package currently qualifies only its NumPy-based core
+workflows. The `deep` extra enables Torch only below Python 3.15; use Python 3.12-3.14
+for neural models.
 
 Documentation tools are contributor dependencies. From a source checkout, run
 `uv sync --extra docs` before building the site.
