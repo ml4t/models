@@ -85,6 +85,7 @@ from ml4t.models import (
 )
 
 assert importlib.util.find_spec("torch") is None
+assert importlib.util.find_spec("ml4t.specs") is None
 assert importlib.resources.files("ml4t.models").joinpath("py.typed").is_file()
 panel = PersistentPanelBatch(returns=np.array([[0.01, 0.02], [0.02, 0.01], [0.03, 0.01]]))
 pca = PCAModel(PCAConfig(n_factors=1))
@@ -101,6 +102,16 @@ portfolio.fit(portfolio_batch)
 assert portfolio.predict(
     PortfolioSequenceBatch(features=portfolio_batch.features, asset_ids=portfolio_batch.asset_ids)
 ).weights.shape == (1, 2, 2)
+
+from ml4t.models import backtest_datafeed_inputs
+
+handoff = backtest_datafeed_inputs(
+    prices_path="prices.parquet",
+    schema={"volume_col": None, "time_contract_version": 2, "calendar": None},
+)
+assert handoff.feed_spec["volume_col"] is None
+assert handoff.feed_spec["calendar"] is None
+assert handoff.feed_spec["time_contract_version"] == 2
 """
     with tempfile.TemporaryDirectory() as directory:
         _run([str(python), "-c", script], cwd=Path(directory))

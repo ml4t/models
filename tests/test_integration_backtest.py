@@ -473,6 +473,7 @@ def test_invalid_calendar_override_does_not_mutate_model_feed_metadata(calendar)
 def test_model_handoff_preserves_bar_grid_without_specs_dependency(monkeypatch) -> None:
     monkeypatch.setattr(backtest_module, "_load_feed_spec_class", lambda: None)
     schema = {
+        "schema": {"volume_col": None},
         "semantics": {
             "time_contract_version": 2,
             "calendar": None,
@@ -480,11 +481,12 @@ def test_model_handoff_preserves_bar_grid_without_specs_dependency(monkeypatch) 
             "bar_label": "right",
             "partial_bar_policy": "include",
             "timestamp_semantics": "bar_close",
-        }
+        },
     }
     inputs = backtest_datafeed_inputs(prices_path="prices.parquet", schema=schema)
 
     payload = json.loads(json.dumps(inputs.feed_spec))
+    assert payload["volume_col"] is None
     for key, value in schema["semantics"].items():
         assert payload[key] == value
     assert specs.FeedSpec.from_mapping(payload).resolve_calendar() is None
