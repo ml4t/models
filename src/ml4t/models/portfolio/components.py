@@ -259,6 +259,7 @@ class MacroGraphAttention(nn.Module):
             still_blocked = blocked.all(dim=-1)
             if bool(still_blocked.any()):
                 blocked = blocked & ~still_blocked.unsqueeze(-1)
+        blocked = blocked.repeat_interleave(self.attention.num_heads, dim=0)
         attended, _ = self.attention(query, query, query, attn_mask=blocked)
         attended = attended.reshape(batch_size, n_periods, n_assets, d_model)
         return self.layer_norm(x + self.dropout(attended))

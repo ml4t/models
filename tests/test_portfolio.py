@@ -316,3 +316,42 @@ def test_deep_portfolio_reuses_fitted_topology_and_rejects_changes() -> None:
     )
     with pytest.raises(ValueError, match="adjacency_mask"):
         model.predict(changed)
+
+
+@pytest.mark.parametrize("heads", [1, 2])
+@pytest.mark.parametrize("isolated_asset", [False, True])
+def test_deep_portfolio_graph_masks_train_with_multiple_heads(
+    heads: int, isolated_asset: bool
+) -> None:
+    rng = np.random.default_rng(71)
+    adjacency = np.zeros((2, 2), dtype=bool)
+    if isolated_asset:
+        adjacency[0, :] = True
+    train = PortfolioSequenceBatch(
+        features=rng.normal(size=(2, 3, 2, 2)),
+        returns=0.01 * rng.normal(size=(2, 3, 2)),
+        adjacency_mask=adjacency,
+        asset_ids=("A", "B"),
+    )
+    model = DeepPortfolioModel(
+        DeepPortfolioConfig(
+            d_model=4,
+            n_heads=1,
+            cross_attention_heads=1,
+            macro_gnn_heads=heads,
+            dropout=0.0,
+            max_iters=1,
+            eval_every=1,
+            checkpoint_every=1,
+            default_checkpoint=1,
+            batch_size=2,
+            device="cpu",
+        )
+    )
+
+    fit = model.fit(train)
+    prediction = model.predict(train)
+
+    assert fit.converged
+    assert prediction.weights.shape == (2, 3, 2)
+    assert np.isfinite(prediction.weights).all()
