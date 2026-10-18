@@ -1,0 +1,29 @@
+<figure class="ml4t-flow-map">
+  <figcaption>Training and checkpoint protocols</figcaption>
+  <div class="ml4t-flow-map__grid">
+    <div class="ml4t-flow-map__item">
+      <strong>Closed-form and alternating models</strong>
+      <p>PCA and RP-PCA use eigendecomposition. IPCA uses alternating least squares.</p>
+      <p>These models expose no neural epoch grid; structural output is reported at <code>epoch = 0</code>.</p>
+    </div>
+    <div class="ml4t-flow-map__item">
+      <strong>Neural checkpoints</strong>
+      <p>CAE, SAE, and neural portfolio learners train for configured epochs or optimization steps.</p>
+      <p>Emit interval checkpoints or explicit checkpoint lists. Set <code>default_checkpoint</code> for prediction.</p>
+    </div>
+    <div class="ml4t-flow-map__item">
+      <strong>Phased SDF training</strong>
+      <ol>
+        <li>Unconditional SDF warm-up</li>
+        <li>Moment-network fitting</li>
+        <li>Conditional SDF refinement</li>
+      </ol>
+      <p>For long SDF runs, use 4-8 explicit structural checkpoints. Beta-head checkpoints have a separate, usually smaller grid.</p>
+    </div>
+    <div class="ml4t-flow-map__item">
+      <strong>Reporting and evaluation</strong>
+      <p>Models emit configured checkpoints and metadata. Diagnostics and case studies select, score, and compare them.</p>
+      <p>Use interval checkpoints for short neural runs and explicit checkpoints for long phased runs. Keep prediction-time defaults explicit.</p>
+    </div>
+  </div>
+</figure>

@@ -4,7 +4,7 @@
 
 This page is the canonical map. Use it as a lookup; the [user guide](../user-guide/index.md) develops each family in depth and the [academic references](academic-references.md) page collects the papers behind each implementation.
 
-![Model Family Map](../images/ml4t_model_family_map.svg)
+--8<-- "model-families.html"
 
 ## The Four Families At A Glance
 

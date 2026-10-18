@@ -1,132 +1,52 @@
 # Book Guide
 
-`ml4t-models` is the library form of the model families developed manually in the book notebooks.
+The public companion repository at revision
+[`d2edec54b1c7a6a9d7a97d8129eb05db4491e1eb`](https://github.com/stefan-jansen/machine-learning-for-trading/tree/d2edec54b1c7a6a9d7a97d8129eb05db4491e1eb)
+provides the teaching files below. Every linked path was checked against that revision's Git tree.
+These notebooks explain methods and often use their own data and dependencies. None of the Chapter 14
+teaching notebooks below imports `ml4t.models`; run the library's small examples for its API.
 
-![From The Factor Zoo To A Library Taxonomy](../images/figure_14_1_factor_zoo_to_discipline.jpeg)
+## Latent factors and factor forecasts
 
-The goal is not to hide the teaching implementation. The goal is to:
+| Public book file | What it does | Related library task |
+|---|---|---|
+| [IPCA notebook](https://github.com/stefan-jansen/machine-learning-for-trading/blob/d2edec54b1c7a6a9d7a97d8129eb05db4491e1eb/14_latent_factors/04_ipca.ipynb) | Manually teaches characteristic-dependent betas and factor forecasts. | [Fit a latent-factor pipeline](../user-guide/latent-factor-pipelines.md) with `IPCAModel` and a separate forecaster. |
+| [Risk-premium PCA notebook](https://github.com/stefan-jansen/machine-learning-for-trading/blob/d2edec54b1c7a6a9d7a97d8129eb05db4491e1eb/14_latent_factors/05_rp_pca.ipynb) | Manually teaches pricing-aware factor extraction. | [Choose a latent-factor model](../user-guide/latent-factor-models.md) with `RPPCAModel`. |
+| [Conditional autoencoder notebook](https://github.com/stefan-jansen/machine-learning-for-trading/blob/d2edec54b1c7a6a9d7a97d8129eb05db4491e1eb/14_latent_factors/06_conditional_autoencoder.ipynb) | Manually builds a neural conditional factor model. | [Choose a latent-factor model](../user-guide/latent-factor-models.md) with `CAEModel`; the library requires `deep`. |
+| [Case-study insights notebook](https://github.com/stefan-jansen/machine-learning-for-trading/blob/d2edec54b1c7a6a9d7a97d8129eb05db4491e1eb/14_latent_factors/09_case_study_insights.ipynb) | Illustrates analysis of stored case-study results, not a first API example. | [Hand results downstream](../user-guide/integration.md). |
 
-- show the architecture and mathematics clearly in the chapter notebooks
-- use the library for repeatable case-study execution and downstream integration
+The book's [case-study library bridge](https://github.com/stefan-jansen/machine-learning-for-trading/blob/d2edec54b1c7a6a9d7a97d8129eb05db4491e1eb/case_studies/utils/latent_factors/library_bridge.py)
+*does* import `ml4t.models` for PCA, IPCA, CAE, SDF, and SAE runs. It is case-study integration
+code with data and registry prerequisites, not a standalone quickstart.
 
-## Chapter Mapping
+## SDF and direct prediction
 
-### Chapter 14: Latent Factors
+| Public book file | What it does | Related library task |
+|---|---|---|
+| [Adversarial SDF notebook](https://github.com/stefan-jansen/machine-learning-for-trading/blob/d2edec54b1c7a6a9d7a97d8129eb05db4491e1eb/14_latent_factors/07_stochastic_discount_factor.ipynb) | Manually teaches phase-aware SDF training. | [Estimate SDF weights](../user-guide/stochastic-discount-factor.md) with `StochasticDiscountFactorModel`. |
+| [Supervised autoencoder notebook](https://github.com/stefan-jansen/machine-learning-for-trading/blob/d2edec54b1c7a6a9d7a97d8129eb05db4491e1eb/14_latent_factors/08_supervised_autoencoder.ipynb) | Manually teaches a direct supervised predictor. | [Predict asset signals](../user-guide/direct-asset-prediction.md) with `SAEModel`. |
 
-The latent-factor chapter corresponds most directly to:
+These neural notebooks need PyTorch and book data. Their full training runs are longer than the
+small CPU examples in this site's task guides. The book's targets and splits may also differ from
+the synthetic examples; results are not directly comparable.
 
-- `PCAModel`
-- `RPPCAModel`
-- `IPCAModel`
-- `CAEModel`
-- `StochasticDiscountFactorModel`
-- `SAEModel` as supervised autoencoder direct prediction
+## Portfolio learning
 
-The key conceptual transition from the notebooks to the library is:
+| Public book file | What it does | Related library task |
+|---|---|---|
+| [Deep portfolio optimization](https://github.com/stefan-jansen/machine-learning-for-trading/blob/d2edec54b1c7a6a9d7a97d8129eb05db4491e1eb/17_portfolio_construction/11_dl_portfolio_allocation.ipynb) | Illustrates a related neural allocation workflow, without calling this library. | [Learn portfolio weights](../user-guide/portfolio-learning.md). |
+| [VLSTM portfolio](https://github.com/stefan-jansen/machine-learning-for-trading/blob/d2edec54b1c7a6a9d7a97d8129eb05db4491e1eb/17_portfolio_construction/12_vlstm_portfolio.ipynb) | Manually teaches variable selection and sequence allocation. | [Learn portfolio weights](../user-guide/portfolio-learning.md) with `LSTMPortfolioModel`. |
+| [DeePM regime robustness](https://github.com/stefan-jansen/machine-learning-for-trading/blob/d2edec54b1c7a6a9d7a97d8129eb05db4491e1eb/17_portfolio_construction/13_deepm_regime_robust.ipynb) | Manually teaches a related DeePM architecture; it is not an exact library implementation. | [Learn portfolio weights](../user-guide/portfolio-learning.md) with `DeepPortfolioModel`. |
 
-- notebook exposition may derive the math and architecture step by step
-- library code enforces the clean separation between:
-  - structural extraction
-  - factor forecasting
-  - asset mapping
+Portfolio notebooks use book-specific data and longer neural training. Start with the library's
+[linear CPU example](https://github.com/ml4t/models/blob/main/examples/portfolio_learning.py)
+for an observable result.
 
-That separation matters most for `IPCAModel` and `CAEModel`. In the teaching notebooks, it
-is helpful to show the full architecture and fitted-return logic step by step. In the
-library, the corresponding production object is the two-step pipeline:
+## Data and downstream boundaries
 
-```text
-structural estimator -> factor-premium forecaster -> asset mapper
-```
+The library's [data contracts](../user-guide/data-contracts.md) preserve timestamps and asset
+identity. [Integration](../user-guide/integration.md) converts predictions and weights to frames for
+`ml4t-diagnostic` and `ml4t-backtest`. The Chapter 14 case-study insights notebook illustrates
+analysis after model runs, but it does not replace those packages' guides or APIs.
 
-### Chapter 17: Portfolio Construction
-
-The end-to-end allocation family corresponds to:
-
-- `LinearFeaturePortfolioModel`
-- `LSTMPortfolioModel`
-- `DeepPortfolioModel`
-
-These models are designed to connect naturally to:
-
-- Chapter 18 cost modeling
-- Chapter 19 risk controls
-- Chapter 20 strategy analysis
-
-## Why The Library Split Matters
-
-The book often needs to compare multiple modeling ideas side by side:
-
-- latent-factor models
-- no-arbitrage SDF models
-- direct signal models
-- end-to-end allocation models
-
-The library turns those into explicit families instead of treating them as one generic “deep learning model.”
-
-## Case Studies
-
-The case studies are intended to act as:
-
-- integration tests
-- realistic pressure tests for the API
-- examples of how to hand model outputs into `ml4t-backtest` and `ml4t-diagnostic`
-
-They should not define the public API by accident.
-
-## Compatibility Status
-
-The `0.1.0` stable line is validated against the Chapter 14 teaching flow and the shared case-study
-latent-factor bridge.
-
-| Book surface | Validation status |
-|---|---|
-| `14_latent_factors/04_ipca.ipynb` | full notebook execution passed |
-| `14_latent_factors/05_rp_pca.ipynb` | full notebook execution passed |
-| `14_latent_factors/06_conditional_autoencoder.ipynb` | full notebook execution passed |
-| `14_latent_factors/07_stochastic_discount_factor.ipynb` | full notebook execution passed |
-| `14_latent_factors/08_supervised_autoencoder.ipynb` | Papermill smoke execution passed; full production training is long-running |
-| `14_latent_factors/09_case_study_insights.ipynb` | full notebook execution passed |
-| `case_studies.utils.latent_factors.library_bridge` | synthetic PCA, IPCA, CAE, SAE, and SDF bridge smoke checks passed |
-
-The teaching notebooks keep hand-built implementations where that improves exposition. The
-case-study path uses `ml4t-models` through the shared latent-factor bridge so the same
-contracts are exercised in walk-forward validation and registry-backed analysis.
-
-## Case-Study Validation
-
-The beta gate also checks that each case-study family can execute its model-specific
-latent-factor notebooks through the shared bridge.
-
-| Case study | Validation status |
-|---|---|
-| ETF returns | PCA, IPCA, SDF, and SAE cached executions passed; CAE passed in cached three-fold validation mode |
-| US firm characteristics | IPCA, CAE, SDF, and SAE passed in cached three-fold validation mode |
-| S&P 500 option analytics | PCA, IPCA, CAE, SDF, and SAE passed in cached three-fold validation mode |
-
-The ETF CAE notebook also reached the cached full-fold execution path and loaded the
-registry-backed model outputs before the notebook kernel exited while processing the large
-cached result set. The three-fold validation run exercises the same library bridge,
-checkpoint handling, prediction schema, and registry persistence path with a bounded
-runtime footprint.
-
-## Evaluation Boundary
-
-Case-study IC reporting is delegated to `ml4t-diagnostic`:
-
-- fold-level scoring calls `ml4t.diagnostic.metrics.cross_sectional_ic`
-- pooled model-analysis summaries call `cross_sectional_ic` and `cross_sectional_ic_series`
-- model outputs are converted into `PredictionsFrame`, `SignalsFrame`, `WeightsFrame`, and
-  `ml4t-backtest` handoff payloads by library adapters
-
-`ml4t-models` remains responsible for fitting and output contracts. Statistical diagnostics
-and execution simulation remain owned by `ml4t-diagnostic` and `ml4t-backtest`.
-
-## Recommended Reading Order
-
-If you are moving from the book notebooks to the library:
-
-1. [Data Contracts](../user-guide/data-contracts.md)
-2. [Latent-Factor Pipelines](../user-guide/latent-factor-pipelines.md)
-3. [Stochastic Discount Factor](../user-guide/stochastic-discount-factor.md)
-4. [Portfolio Learning](../user-guide/portfolio-learning.md)
-5. [Integration](../user-guide/integration.md)
+The [Quickstart](../getting-started/quickstart.md) is the first runnable library workflow.

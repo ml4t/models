@@ -32,7 +32,8 @@ The stable candidate requires all of these results:
 
 - Ruff, formatting, ty, documentation, and coverage thresholds
 - installed-wheel tests on Linux, macOS, and Windows for Python 3.12, 3.13, and 3.14
-- installed core-wheel tests on the current Python 3.15 prerelease for all three operating systems
+- installed NumPy-core wheel tests on Python 3.15 for all three operating systems; this
+  does not qualify Torch-backed models on that interpreter
 - current and supported-minimum dependency vulnerability scans
 - identical wheel members on every stable operating-system and Python cell, with a byte-identical
   rebuild on the canonical Linux/Python 3.12 build cell

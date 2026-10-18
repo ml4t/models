@@ -71,8 +71,10 @@ Stable releases support:
 - Python 3.13
 - Python 3.14
 
-Python 3.15 prereleases run a separate compatibility gate. They are not part of the stable
-support range until the Python and dependency ecosystems publish compatible stable releases.
+Python 3.15 is stable. This package currently qualifies its NumPy-based core through a
+separate installed-wheel gate. The `deep` extra enables Torch only below Python 3.15;
+use Python 3.12-3.14 for CAE, SAE, SDF and neural portfolio models. Passing the core gate
+does not establish neural or accelerator support on Python 3.15.
 
 ## Development Setup
 
