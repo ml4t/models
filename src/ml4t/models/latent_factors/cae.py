@@ -146,6 +146,7 @@ class CAEModel(BaseLatentFactorModel[CAEConfig]):
         loss_sums: dict[int, float] = dict.fromkeys(checkpoint_epochs, 0.0)
         val_best_losses: list[float] = []
         skipped_updates = 0
+        applied_updates = 0
 
         for ensemble_idx in range(self.config.n_ensemble):
             seed = self.config.seed + ensemble_idx
@@ -192,6 +193,7 @@ class CAEModel(BaseLatentFactorModel[CAEConfig]):
 
                     epoch_loss += float(loss.item())
                     n_batches += 1
+                    applied_updates += 1
 
                 mean_loss = epoch_loss / max(n_batches, 1)
                 if epoch in checkpoint_epochs:
@@ -217,6 +219,13 @@ class CAEModel(BaseLatentFactorModel[CAEConfig]):
             if best_state is not None:
                 self._checkpoint_states[0].append(best_state)
                 val_best_losses.append(best_val_loss)
+
+        if self.config.hidden_units and applied_updates == 0:
+            raise ValueError(
+                "CAE training updated no parameters because every minibatch had one row. "
+                "Beta BatchNorm cannot train on a single observation; provide at least two "
+                "valid rows and set batch_size to at least 2."
+            )
 
         history: list[dict[str, float | str]] = []
         for epoch in checkpoint_epochs:

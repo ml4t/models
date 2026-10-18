@@ -405,11 +405,9 @@ def backtest_inputs_from_weights(
 def _coerce_feed_spec_mapping(schema: Any | None) -> dict[str, Any]:
     feed_spec_cls = _load_feed_spec_class()
     if feed_spec_cls is not None:
-        return {
-            key: value
-            for key, value in asdict(feed_spec_cls.from_any(schema)).items()
-            if value is not None
-        }
+        spec = feed_spec_cls.from_any(schema)
+        data = spec.to_dict() if hasattr(spec, "to_dict") else asdict(spec)
+        return {key: value for key, value in data.items() if value is not None}
     return _fallback_feed_spec_mapping(schema)
 
 
