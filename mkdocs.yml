@@ -4,6 +4,9 @@ site_url: https://www.ml4trading.io/docs/models/
 repo_url: https://github.com/ml4t/models
 repo_name: ml4t/models
 
+exclude_docs: |
+  /_includes/
+
 theme:
   name: material
   custom_dir: docs/overrides
@@ -63,6 +66,9 @@ markdown_extensions:
   - pymdownx.magiclink
   - pymdownx.mark
   - pymdownx.smartsymbols
+  - pymdownx.snippets:
+      base_path: [docs/_includes]
+      check_paths: true
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid

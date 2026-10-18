@@ -278,9 +278,15 @@ body {
 }
 
 .md-typeset table:not([class]) {
+  font-size: max(14px, 0.95em);
   border-radius: 0.75rem;
   overflow: hidden;
   border: 1px solid var(--ml4t-silver-muted);
+}
+
+.md-typeset table:not([class]) code {
+  font-size: 1em;
+  white-space: nowrap;
 }
 
 .md-typeset table:not([class]) th {
@@ -292,6 +298,50 @@ body {
 .md-typeset details {
   border-radius: 0.75rem;
   box-shadow: none;
+}
+
+.md-typeset .ml4t-flow-map {
+  display: block;
+  width: 100%;
+  margin: 1.2em 0;
+  text-align: left;
+  font-size: max(14px, 0.95em);
+}
+
+.md-typeset .ml4t-flow-map figcaption {
+  max-width: none;
+  margin: 0 0 0.8em;
+  text-align: left;
+  font-size: 1em;
+  font-style: normal;
+  font-weight: 600;
+}
+
+.ml4t-flow-map__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+  gap: 0.8em;
+}
+
+.ml4t-flow-map__item {
+  min-width: 0;
+  border: 1px solid var(--ml4t-silver-muted);
+  border-radius: 0.6rem;
+  padding: 0.8em;
+}
+
+.ml4t-flow-map__wide {
+  grid-column: 1 / -1;
+}
+
+.md-typeset .ml4t-flow-map p,
+.md-typeset .ml4t-flow-map ol {
+  margin: 0.6em 0 0;
+}
+
+.md-typeset .ml4t-flow-map code {
+  font-size: 1em;
+  overflow-wrap: anywhere;
 }
 
 /* ── Footer ───────────────────────────────────────── */

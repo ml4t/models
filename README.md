@@ -45,7 +45,8 @@ It also keeps the predictive steps explicit:
 - asset mapping
 - downstream prediction and weight frames for `ml4t-backtest` and `ml4t-diagnostic`
 
-![ml4t-models Architecture](docs/images/ml4t_models_architecture.svg)
+The [architecture guide](https://www.ml4trading.io/docs/models/reference/architecture/)
+connects these data contracts, model outputs, and downstream handoffs.
 
 ## Installation
 

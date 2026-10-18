@@ -51,7 +51,7 @@ for verified public teaching notebooks.
 
 ## Architecture At A Glance
 
-![Model Family Map](images/ml4t_model_family_map.svg)
+--8<-- "model-families.html"
 
 ## Why This Library Exists
 

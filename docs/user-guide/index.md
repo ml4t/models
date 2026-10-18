@@ -10,7 +10,7 @@ The fastest way to understand the library is to ask four questions:
 3. what is the native output?
 4. what still has to happen before you can trade or backtest it?
 
-![Model Families](../images/ml4t_model_family_map.svg)
+--8<-- "model-families.html"
 
 The core design choice is simple: do not force structurally different finance models through
 one artificial `fit/predict` story. A latent-factor model, a stochastic discount factor
