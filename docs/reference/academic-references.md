@@ -1,6 +1,6 @@
 # Academic References
 
-This page is the canonical bibliography for the model families implemented in `ml4t-models`. Every claim that touches an estimator, a loss, or an architectural choice in the user guide should resolve here. Citations follow the Chicago author-date convention used throughout *Machine Learning for Trading*; the paper anchors mirror the bibliography in `~/ml4t/book/14_latent_factors/bibliography.json`.
+This page is the canonical bibliography for the model families implemented in `ml4t-models`. Every claim that touches an estimator, a loss, or an architectural choice in the user guide should resolve here. Citations follow the Chicago author-date convention used throughout *Machine Learning for Trading*.
 
 If a model adds a new mechanism, the corresponding paper should be added here first, then referenced from the user guide.
 

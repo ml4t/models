@@ -4,7 +4,7 @@ The library is organized around finance-native model families and contracts.
 
 ## Top-Level Design
 
-![Model Family Map](../images/ml4t_model_family_map.svg)
+--8<-- "model-families.html"
 
 ## Why The Families Are Separate
 
@@ -41,7 +41,7 @@ This family learns allocations directly:
 
 ## Training Protocol Map
 
-![Training Protocol Map](../images/ml4t_training_protocols.svg)
+--8<-- "training-protocols.html"
 
 ## Latent-Factor Pipeline Diagram
 

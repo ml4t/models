@@ -91,3 +91,49 @@ def test_sae_classification_returns_probabilities() -> None:
 
     assert np.nanmin(signal.signal_values) >= 0.0
     assert np.nanmax(signal.signal_values) <= 1.0
+
+
+def test_sae_trains_when_the_last_minibatch_would_be_a_single_row() -> None:
+    rng = np.random.default_rng(11)
+    characteristics = rng.normal(size=(2, 9, 3))
+    returns = 0.2 * characteristics[..., 0]
+    batch = CrossSectionBatch(characteristics=characteristics, returns=returns)
+    model = SAEModel(
+        SAEConfig(
+            bottleneck_dim=4,
+            aux_hidden_dim=4,
+            main_hidden_units=(8, 8, 8, 4),
+            dropout_rates=(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            n_epochs=1,
+            checkpoint_interval=1,
+            batch_size=17,
+            lr=1e-3,
+        )
+    )
+
+    model.fit(batch)
+    signal = model.predict(batch, checkpoint=1)
+
+    assert model.is_fitted
+    assert np.isfinite(signal.signal_values).all()
+
+
+def test_sae_rejects_a_single_training_row() -> None:
+    batch = CrossSectionBatch(
+        characteristics=np.ones((1, 1, 2), dtype=np.float64),
+        returns=np.ones((1, 1), dtype=np.float64),
+    )
+    model = SAEModel(
+        SAEConfig(
+            bottleneck_dim=4,
+            aux_hidden_dim=4,
+            main_hidden_units=(8, 8, 8, 4),
+            n_epochs=1,
+            checkpoint_interval=1,
+        )
+    )
+
+    with pytest.raises(ValueError, match="at least 2 valid observations"):
+        model.fit(batch)
+
+    assert not model.is_fitted

@@ -179,18 +179,24 @@ class CrossSectionalAttention(nn.Module):
     def forward(self, x: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
         batch_size, n_periods, n_assets, d_model = x.shape
         if self.lag > 0:
-            pad = torch.zeros(
-                (batch_size, self.lag, n_assets, d_model),
-                device=x.device,
-                dtype=x.dtype,
-            )
-            kv = torch.cat([pad, x[:, : n_periods - self.lag]], dim=1)
-            pad_mask = torch.zeros(
-                (batch_size, self.lag, n_assets),
-                device=mask.device,
-                dtype=mask.dtype,
-            )
-            kv_mask = torch.cat([pad_mask, mask[:, : n_periods - self.lag]], dim=1)
+            history = n_periods - self.lag
+            if history <= 0:
+                # A negative slice would wrap to the end of the window.
+                kv = torch.zeros_like(x)
+                kv_mask = torch.zeros_like(mask)
+            else:
+                pad = torch.zeros(
+                    (batch_size, self.lag, n_assets, d_model),
+                    device=x.device,
+                    dtype=x.dtype,
+                )
+                kv = torch.cat([pad, x[:, :history]], dim=1)
+                pad_mask = torch.zeros(
+                    (batch_size, self.lag, n_assets),
+                    device=mask.device,
+                    dtype=mask.dtype,
+                )
+                kv_mask = torch.cat([pad_mask, mask[:, :history]], dim=1)
         else:
             kv = x
             kv_mask = mask
@@ -239,16 +245,21 @@ class MacroGraphAttention(nn.Module):
         query = x.reshape(batch_size * n_periods, n_assets, d_model)
         key_padding_mask = mask.reshape(batch_size * n_periods, n_assets) < 0.5
         adjacency_mask = self.get_buffer("_adjacency_mask_buffer")
-        combined = adjacency_mask.unsqueeze(0) | key_padding_mask.unsqueeze(1)
-        all_blocked = combined.all(dim=-1)
-        if all_blocked.any():
-            key_padding_mask = key_padding_mask & ~all_blocked
-        attended, _ = self.attention(
-            query,
-            query,
-            query,
-            attn_mask=adjacency_mask,
-            key_padding_mask=key_padding_mask,
-        )
+        # True blocks attention. A query with no legal key makes softmax NaN,
+        # so fall back to self when that asset is present and otherwise allow
+        # a finite dummy attention that the caller mask zeros out.
+        blocked = adjacency_mask.unsqueeze(0) | key_padding_mask.unsqueeze(1)
+        fully_blocked = blocked.all(dim=-1)
+        if bool(fully_blocked.any()):
+            eye = torch.eye(n_assets, device=blocked.device, dtype=torch.bool)
+            allow_self = (
+                fully_blocked.unsqueeze(-1) & eye.unsqueeze(0) & (~key_padding_mask).unsqueeze(1)
+            )
+            blocked = blocked & ~allow_self
+            still_blocked = blocked.all(dim=-1)
+            if bool(still_blocked.any()):
+                blocked = blocked & ~still_blocked.unsqueeze(-1)
+        blocked = blocked.repeat_interleave(self.attention.num_heads, dim=0)
+        attended, _ = self.attention(query, query, query, attn_mask=blocked)
         attended = attended.reshape(batch_size, n_periods, n_assets, d_model)
         return self.layer_norm(x + self.dropout(attended))

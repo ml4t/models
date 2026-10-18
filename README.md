@@ -4,7 +4,7 @@
 [![PyPI](https://img.shields.io/pypi/v/ml4t-models)](https://pypi.org/project/ml4t-models/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Finance-native model implementations for latent-factor estimation, stochastic discount factor learning, direct asset prediction, and end-to-end portfolio learning.
+Finance-specific models for asset pricing, prediction, and portfolio learning.
 
 Documentation: [ml4trading.io/docs/models](https://www.ml4trading.io/docs/models/)
 
@@ -45,7 +45,8 @@ It also keeps the predictive steps explicit:
 - asset mapping
 - downstream prediction and weight frames for `ml4t-backtest` and `ml4t-diagnostic`
 
-![ml4t-models Architecture](docs/images/ml4t_models_architecture.svg)
+The [architecture guide](https://www.ml4trading.io/docs/models/reference/architecture/)
+connects these data contracts, model outputs, and downstream handoffs.
 
 ## Installation
 
@@ -61,104 +62,52 @@ pip install ml4t-models[integration]  # polars + ml4t-specs bridges
 pip install ml4t-models[all]          # all runtime capabilities
 ```
 
-Supported stable interpreters are Python 3.12, 3.13, and 3.14. Python 3.15 prereleases run a
-separate compatibility gate and are not yet part of the stable support range.
+Supported interpreters for all model families are Python 3.12, 3.13, and 3.14.
+Python 3.15 is stable, but this package currently qualifies only its NumPy-based core
+workflows. The `deep` extra enables Torch only below Python 3.15; use Python 3.12-3.14
+for neural models.
 
 Documentation tools are contributor dependencies. From a source checkout, run
 `uv sync --extra docs` before building the site.
 
 ## Quick Start
 
-### 1. Latent-Factor Forecast Pipeline
+The base package can produce a first forecast on a small synthetic panel without credentials or
+an accelerator. Run this complete example with `pip install ml4t-models`:
 
 ```python
 import numpy as np
-
 from ml4t.models import (
     BetaLambdaMapper,
-    CrossSectionBatch,
     ExpandingMeanFactorForecaster,
-    IPCAConfig,
-    IPCAModel,
     LatentFactorForecastPipeline,
+    PCAConfig,
+    PCAModel,
+    PersistentPanelBatch,
 )
 
-batch = CrossSectionBatch(
-    characteristics=np.random.randn(24, 200, 12),
-    returns=np.random.randn(24, 200),
-    timestamps=tuple(range(24)),
+asset_ids = tuple(f"asset_{i}" for i in range(6))
+train = PersistentPanelBatch(
+    returns=np.random.default_rng(1).normal(scale=0.02, size=(12, 6)),
+    timestamps=tuple(f"2024-{month:02d}" for month in range(1, 13)),
+    asset_ids=asset_ids,
 )
-
+future = PersistentPanelBatch(timestamps=("2025-01", "2025-02"), asset_ids=asset_ids)
 pipeline = LatentFactorForecastPipeline(
-    model=IPCAModel(IPCAConfig(n_factors=3)),
+    model=PCAModel(PCAConfig(n_factors=2)),
     forecaster=ExpandingMeanFactorForecaster(),
     mapper=BetaLambdaMapper(),
 )
-pipeline.fit(batch)
-prediction = pipeline.predict(batch)
-
-print(prediction.asset_forecast.expected_returns.shape)
-# (24, 200)
+pipeline.fit(train)
+forecast = pipeline.predict(future).asset_forecast.expected_returns
+assert forecast.shape == (2, 6) and np.isfinite(forecast).all()
+print(forecast.shape)  # (2, 6)
 ```
 
-### 2. Weight-Native Stochastic Discount Factor
-
-```python
-import numpy as np
-
-from ml4t.models import (
-    CrossSectionBatch,
-    StochasticDiscountFactorConfig,
-    StochasticDiscountFactorModel,
-)
-
-batch = CrossSectionBatch(
-    characteristics=np.random.randn(36, 300, 16),
-    returns=np.random.randn(36, 300),
-    context_features=np.random.randn(36, 8),
-    timestamps=tuple(range(36)),
-)
-
-model = StochasticDiscountFactorModel(
-    StochasticDiscountFactorConfig(checkpoint_epochs=(256, 512, 768, 1024))
-)
-model.fit(batch)
-state = model.extract(batch, checkpoint=1280)
-
-print(state.asset_weights.shape)
-# (36, 300)
-```
-
-### 3. End-to-End Portfolio Learning
-
-```python
-import numpy as np
-
-from ml4t.models import LSTMPortfolioConfig, LSTMPortfolioModel, PortfolioSequenceBatch
-
-batch = PortfolioSequenceBatch(
-    features=np.random.randn(8, 63, 20, 10),
-    returns=np.random.randn(8, 63, 20),
-    timestamps=tuple(range(63)),
-    asset_ids=tuple(f"asset_{i}" for i in range(20)),
-)
-
-model = LSTMPortfolioModel(LSTMPortfolioConfig(max_iters=20, checkpoint_every=5))
-model.fit(batch)
-weights = model.predict(batch, checkpoint=20)
-
-print(weights.weights.shape)
-# (8, 63, 20)
-```
-
-### 4. Hand Off Predictions To The Rest Of ML4T
-
-```python
-from ml4t.models import predictions_frame_from_asset_forecast, write_backtest_frames
-
-frame = predictions_frame_from_asset_forecast(prediction.asset_forecast)
-write_backtest_frames("artifacts/run_001", predictions=frame)
-```
+The forecast uses the training factor history and preserves the future dates and asset order.
+It does not imply trading performance. The [Quickstart](docs/getting-started/quickstart.md)
+explains the result, and the [Book Guide](docs/book-guide/index.md) links to pinned teaching files.
+The `deep` extra is needed for neural models; the `integration` extra adds Polars and Specs support.
 
 ## Model Families
 

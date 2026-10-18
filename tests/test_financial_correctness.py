@@ -16,8 +16,12 @@ from ml4t.models.configs.portfolio import PortfolioConfig
 from ml4t.models.latent_factors.ipca import _normalize_theta_y
 from ml4t.models.latent_factors.rp_pca import _risk_premium_matrix
 from ml4t.models.portfolio import runtime as portfolio_runtime
+from ml4t.models.portfolio.components import CrossSectionalAttention, MacroGraphAttention
 from ml4t.models.portfolio.losses import compute_net_portfolio_returns, softmin_sharpe
-from ml4t.models.portfolio.postprocessors import normalize_cross_sectional_weights
+from ml4t.models.portfolio.postprocessors import (
+    apply_turnover_limit,
+    normalize_cross_sectional_weights,
+)
 
 
 def test_rp_pca_default_matches_lettau_pelger_signal_matrix() -> None:
@@ -324,6 +328,91 @@ def test_portfolio_best_checkpoint_contains_exact_evaluated_state(
     assert float(artifacts.checkpoint_states[1]["scale"].item()) == pytest.approx(
         evaluated_states[0]
     )
+
+
+def test_cross_attention_lag_longer_than_the_window_does_not_wrap() -> None:
+    torch.manual_seed(0)
+    window = torch.randn(1, 3, 2, 4)
+    mask = torch.ones(1, 3, 2)
+    matched = CrossSectionalAttention(d_model=4, n_heads=1, dropout=0.0, lag=3)
+    longer = CrossSectionalAttention(d_model=4, n_heads=1, dropout=0.0, lag=8)
+    longer.load_state_dict(matched.state_dict())
+    matched.eval()
+    longer.eval()
+
+    matched_output = matched(window, mask)
+    longer_output = longer(window, mask)
+
+    assert matched_output.shape == window.shape
+    assert torch.isfinite(longer_output).all()
+    torch.testing.assert_close(longer_output, matched_output)
+
+
+def test_graph_attention_stays_finite_when_a_node_has_no_neighbors() -> None:
+    torch.manual_seed(0)
+    layer = MacroGraphAttention(
+        d_model=4,
+        n_heads=1,
+        dropout=0.0,
+        adjacency_mask=torch.ones(2, 2, dtype=torch.bool),
+    )
+    layer.eval()
+    features = torch.randn(1, 2, 2, 4, requires_grad=True)
+    mask = torch.ones(1, 2, 2)
+
+    output = layer(features, mask)
+    output.sum().backward()
+
+    assert torch.isfinite(output).all()
+    assert features.grad is not None
+    assert torch.isfinite(features.grad).all()
+
+
+def test_graph_attention_ignores_a_masked_only_neighbor() -> None:
+    layer = MacroGraphAttention(
+        d_model=4,
+        n_heads=1,
+        dropout=0.0,
+        adjacency_mask=torch.tensor([[True, False], [True, True]]),
+    )
+    layer.eval()
+    base = torch.randn(1, 1, 2, 4)
+    shifted = base.clone()
+    shifted[..., 1, :] += 10.0
+    mask = torch.tensor([[[1.0, 0.0]]])
+
+    base_output = layer(base, mask)
+    shifted_output = layer(shifted, mask)
+
+    assert torch.isfinite(base_output).all()
+    torch.testing.assert_close(base_output[:, :, 0, :], shifted_output[:, :, 0, :])
+
+
+def test_zero_turnover_limit_holds_the_previous_book() -> None:
+    weights = np.array([[[0.4, -0.4], [0.2, -0.1]]], dtype=np.float64)
+    previous = np.array([[0.5, -0.5]], dtype=np.float64)
+
+    actual = apply_turnover_limit(
+        weights,
+        previous_weights=previous,
+        mask=np.ones_like(weights, dtype=bool),
+        turnover_limit=0.0,
+    )
+
+    np.testing.assert_allclose(actual[0, 0], previous[0])
+    np.testing.assert_allclose(actual[0, 1], previous[0])
+
+
+def test_negative_turnover_limit_is_rejected() -> None:
+    weights = np.ones((1, 1, 2), dtype=np.float64)
+
+    with pytest.raises(ValueError, match="turnover_limit"):
+        apply_turnover_limit(
+            weights,
+            previous_weights=np.zeros((1, 2)),
+            mask=np.ones_like(weights, dtype=bool),
+            turnover_limit=-0.1,
+        )
 
 
 def test_portfolio_constraints_are_satisfied_jointly() -> None:

@@ -1,0 +1,42 @@
+<figure class="ml4t-flow-map">
+  <figcaption>Model families and native outputs</figcaption>
+  <div class="ml4t-flow-map__grid">
+    <div class="ml4t-flow-map__item">
+      <strong>Latent factors</strong>
+      <p><code>PCAModel</code>, <code>RPPCAModel</code>, <code>IPCAModel</code>, <code>CAEModel</code></p>
+      <p>PCA and RP-PCA use <code>PersistentPanelBatch</code>. IPCA and CAE use <code>CrossSectionBatch</code>.</p>
+      <p>Native outputs are loadings or conditional betas, factor history, and structural state.</p>
+    </div>
+    <div class="ml4t-flow-map__item">
+      <strong>Stochastic discount factor</strong>
+      <p><code>StochasticDiscountFactorModel</code></p>
+      <p>Input: <code>CrossSectionBatch</code>.</p>
+      <p>Outputs: <code>asset_weights</code>, <code>sdf_values</code>, and phase-aware checkpoints.</p>
+    </div>
+    <div class="ml4t-flow-map__item">
+      <strong>Direct asset prediction</strong>
+      <p><code>SAEModel</code></p>
+      <p>Input: <code>CrossSectionBatch</code>.</p>
+      <p>Output: cross-sectional signals in <code>AssetSignalResult</code>.</p>
+    </div>
+    <div class="ml4t-flow-map__item">
+      <strong>Portfolio learning</strong>
+      <p><code>LinearFeaturePortfolioModel</code>, <code>LSTMPortfolioModel</code>, <code>DeepPortfolioModel</code></p>
+      <p>Input: <code>PortfolioSequenceBatch</code>.</p>
+      <p>Output: target weights in <code>PortfolioWeightsResult</code>.</p>
+      <p>Neural learners can include trading costs in their training objective.</p>
+    </div>
+    <div class="ml4t-flow-map__item ml4t-flow-map__wide">
+      <strong>Latent-factor return forecasts require three stages</strong>
+      <ol>
+        <li>Structural estimation produces <code>LatentFactorState</code>.</li>
+        <li>A separate factor-premium forecaster produces <code>FactorForecastResult</code>.</li>
+        <li>An asset mapper combines state and forecast into <code>AssetForecastResult</code>.</li>
+      </ol>
+    </div>
+    <div class="ml4t-flow-map__item ml4t-flow-map__wide">
+      <strong>Downstream handoff</strong>
+      <p><code>PredictionsFrame</code> carries forecasts or direct signals. <code>WeightsFrame</code> and <code>ContextFrame</code> support backtests and portfolio diagnostics.</p>
+    </div>
+  </div>
+</figure>

@@ -1,5 +1,24 @@
 # Portfolio Learning
 
+## Run and verify weights
+
+Run the [linear CPU example](https://github.com/ml4t/models/blob/main/examples/portfolio_learning.py)
+with the base install. It verifies `(windows, periods, assets)` output and that postprocessed
+gross exposure stays at or below `0.8`. The sequence batch must retain the same asset IDs and
+time order as the features and returns. LSTM and DeepPortfolio need `ml4t-models[deep]`; their
+production training may need an accelerator and considerably more time. A small CPU smoke run
+can check shapes and constraints, but not investment performance. Consult the
+[API reference](../api/index.md) for each config and result contract.
+
+The [neural smoke example](https://github.com/ml4t/models/blob/main/examples/portfolio_neural.py)
+checks bounded LSTM and DeepPortfolio fits on CPU with two optimization steps. Use a separate
+validation period and more training for any research comparison.
+
+The book's [VLSTM](https://github.com/stefan-jansen/machine-learning-for-trading/blob/d2edec54b1c7a6a9d7a97d8129eb05db4491e1eb/17_portfolio_construction/12_vlstm_portfolio.ipynb)
+and [DeePM](https://github.com/stefan-jansen/machine-learning-for-trading/blob/d2edec54b1c7a6a9d7a97d8129eb05db4491e1eb/17_portfolio_construction/13_deepm_regime_robust.ipynb)
+notebooks teach related manual implementations. They do not call this library and are not exact
+equivalents of these classes.
+
 Portfolio models in `ml4t-models` learn weights directly.
 
 They do not first estimate expected returns and then call a separate optimizer unless you
