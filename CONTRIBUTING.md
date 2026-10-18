@@ -5,6 +5,10 @@ Search existing issues first. Describe one problem or coherent change per issue 
 focused PR linked to its owning issue. Automated dependency updates and administrative metadata
 changes retain the shared exception.
 
+Maintainer-directed work may group related issues in one bounded PR under the shared policy.
+Keep changes together when they serve the same workflow or subsystem repair and can be reviewed
+and reverted together. Split unrelated changes and changes needing independent release decisions.
+
 For defects, provide a minimal reproduction through the public API or user workflow, package and
 environment details, and expected behavior. Record a regression failing on the relevant base and
 passing on the fix, with exact revisions, commands, and results. Correct verified numerical defects;
