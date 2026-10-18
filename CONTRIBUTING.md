@@ -5,9 +5,9 @@ Search existing issues first. Describe one problem or coherent change per issue 
 focused PR linked to its owning issue. Automated dependency updates and administrative metadata
 changes retain the shared exception.
 
-Maintainer-directed work may group related issues in one bounded PR under the shared policy.
-Keep changes together when they serve the same workflow or subsystem repair and can be reviewed
-and reverted together. Split unrelated changes and changes needing independent release decisions.
+Maintainer-directed work in this repository follows the local
+[batching rules](AGENTS.md#maintainer-directed-change-batching), which allow related issues in one
+bounded PR when they can be reviewed and reverted together.
 
 For defects, provide a minimal reproduction through the public API or user workflow, package and
 environment details, and expected behavior. Record a regression failing on the relevant base and
