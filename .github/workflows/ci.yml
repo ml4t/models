@@ -293,7 +293,7 @@ jobs:
             'numpy==1.26.0' \
             'torch==2.13.0' \
             'polars==1.0.0' \
-            'ml4t-specs==0.1.0b0' \
+            'ml4t-specs==0.2.0' \
             'pytest==9.0.3' \
             'setuptools>=83.0.0' \
             pip-audit

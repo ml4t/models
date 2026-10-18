@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
+from enum import Enum
 from importlib import import_module
 from pathlib import Path
 from typing import Any
@@ -25,6 +26,10 @@ from ml4t.models.types import (
     AssetWeightsResult,
     PortfolioWeightsResult,
 )
+
+
+class _CalendarUnset(Enum):
+    UNSET = "unset"
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,7 +81,7 @@ def resolve_feed_spec_mapping(
     mid_col: str | None = None,
     bid_size_col: str | None = None,
     ask_size_col: str | None = None,
-    calendar: str | None = None,
+    calendar: str | None | _CalendarUnset = _CalendarUnset.UNSET,
     timezone: str | None = None,
     data_frequency: Any | None = None,
     bar_type: str | None = None,
@@ -118,7 +123,6 @@ def resolve_feed_spec_mapping(
         "mid_col": mid_col,
         "bid_size_col": bid_size_col,
         "ask_size_col": ask_size_col,
-        "calendar": calendar,
         "timezone": timezone,
         "data_frequency": data_frequency,
         "bar_type": bar_type,
@@ -128,6 +132,12 @@ def resolve_feed_spec_mapping(
     for key, value in overrides.items():
         if value is not None:
             spec_mapping[key] = value
+
+    if calendar is not _CalendarUnset.UNSET:
+        if calendar is not None and (not isinstance(calendar, str) or not calendar.strip()):
+            raise ValueError("calendar must be a non-empty name or None")
+        spec_mapping["calendar"] = calendar
+        spec_mapping["time_contract_version"] = 2
 
     if price_col is None:
         if close_col is not None:
@@ -168,7 +178,7 @@ def backtest_datafeed_inputs(
     mid_col: str | None = None,
     bid_size_col: str | None = None,
     ask_size_col: str | None = None,
-    calendar: str | None = None,
+    calendar: str | None | _CalendarUnset = _CalendarUnset.UNSET,
     timezone: str | None = None,
     data_frequency: Any | None = None,
     bar_type: str | None = None,
@@ -239,7 +249,7 @@ def backtest_inputs_from_asset_forecast(
     mid_col: str | None = None,
     bid_size_col: str | None = None,
     ask_size_col: str | None = None,
-    calendar: str | None = None,
+    calendar: str | None | _CalendarUnset = _CalendarUnset.UNSET,
     timezone: str | None = None,
     data_frequency: Any | None = None,
     bar_type: str | None = None,
@@ -299,7 +309,7 @@ def backtest_inputs_from_asset_signal(
     mid_col: str | None = None,
     bid_size_col: str | None = None,
     ask_size_col: str | None = None,
-    calendar: str | None = None,
+    calendar: str | None | _CalendarUnset = _CalendarUnset.UNSET,
     timezone: str | None = None,
     data_frequency: Any | None = None,
     bar_type: str | None = None,
@@ -360,7 +370,7 @@ def backtest_inputs_from_weights(
     mid_col: str | None = None,
     bid_size_col: str | None = None,
     ask_size_col: str | None = None,
-    calendar: str | None = None,
+    calendar: str | None | _CalendarUnset = _CalendarUnset.UNSET,
     timezone: str | None = None,
     data_frequency: Any | None = None,
     bar_type: str | None = None,
@@ -404,11 +414,15 @@ def backtest_inputs_from_weights(
 
 def _coerce_feed_spec_mapping(schema: Any | None) -> dict[str, Any]:
     feed_spec_cls = _load_feed_spec_class()
-    if feed_spec_cls is not None:
-        spec = feed_spec_cls.from_any(schema)
-        data = spec.to_dict() if hasattr(spec, "to_dict") else asdict(spec)
-        return {key: value for key, value in data.items() if value is not None}
-    return _fallback_feed_spec_mapping(schema)
+    if feed_spec_cls is None:
+        return _fallback_feed_spec_mapping(schema)
+    spec = feed_spec_cls.from_any(schema)
+    data = spec.to_dict() if hasattr(spec, "to_dict") else asdict(spec)
+    return {
+        key: value
+        for key, value in data.items()
+        if value is not None or (key == "calendar" and data.get("time_contract_version") == 2)
+    }
 
 
 def _load_feed_spec_class() -> type[Any] | None:
@@ -463,6 +477,10 @@ def _fallback_feed_spec_mapping(schema: Any | None) -> dict[str, Any]:
                 "bar_type",
                 "timestamp_semantics",
                 "session_start_time",
+                "time_contract_version",
+                "bar_grid_anchor",
+                "bar_label",
+                "partial_bar_policy",
             ),
         )
     else:
@@ -502,6 +520,10 @@ def _fallback_feed_spec_mapping(schema: Any | None) -> dict[str, Any]:
                 "bar_type",
                 "timestamp_semantics",
                 "session_start_time",
+                "time_contract_version",
+                "bar_grid_anchor",
+                "bar_label",
+                "partial_bar_policy",
             ),
         )
 
