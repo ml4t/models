@@ -1,5 +1,19 @@
 # Latent-Factor Pipelines
 
+## Run and verify a forecast
+
+Start with the [complete PCA workflow](../getting-started/quickstart.md). It fits on 12 observed
+periods, predicts at two future dates, and asserts a finite `(2, 6)` asset forecast. Keep the
+same asset IDs and order in the future `PersistentPanelBatch`. Use a dated
+`CrossSectionBatch` with characteristics for IPCA or CAE, and separate training observations
+from the dates being forecast. Fit the structural model and forecaster on training data before
+mapping future exposures; fitting on evaluation returns leaks future information.
+
+The [pipeline API](../api/index.md#pipelines) gives exact signatures and config options. The
+[IPCA teaching notebook](https://github.com/stefan-jansen/machine-learning-for-trading/blob/d2edec54b1c7a6a9d7a97d8129eb05db4491e1eb/14_latent_factors/04_ipca.ipynb)
+implements the method manually and does not call this library. Its data and runtime differ from
+the synthetic CPU example.
+
 The core latent-factor abstraction in `ml4t-models` is:
 
 ```text

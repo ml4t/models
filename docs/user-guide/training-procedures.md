@@ -8,7 +8,7 @@ stochastic discount factor family has phased adversarial training. Portfolio lea
 optimize a turnover-aware objective directly. The library keeps those differences explicit
 and makes checkpoint reporting part of the public contract.
 
-![Training Protocols](../images/ml4t_training_protocols.svg)
+--8<-- "training-protocols.html"
 
 ## Why Checkpoints Are First-Class
 

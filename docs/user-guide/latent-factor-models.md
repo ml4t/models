@@ -1,5 +1,17 @@
 # Latent-Factor Models
 
+For a bounded first result, run the [PCA quickstart](../getting-started/quickstart.md) and verify
+the forecast shape and finite values. The [variant example](https://github.com/ml4t/models/blob/main/examples/latent_factor_variants.py)
+also checks one-date forecasts from RP-PCA, IPCA, and CAE. `PCAModel` and `RPPCAModel` need persistent asset identities;
+`IPCAModel` and `CAEModel` need dated characteristics. CAE requires `ml4t-models[deep]` and its
+full training cost depends on epochs and data size. The [API reference](../api/index.md) lists
+the released classes and configs.
+
+The book [RP-PCA](https://github.com/stefan-jansen/machine-learning-for-trading/blob/d2edec54b1c7a6a9d7a97d8129eb05db4491e1eb/14_latent_factors/05_rp_pca.ipynb)
+and [CAE](https://github.com/stefan-jansen/machine-learning-for-trading/blob/d2edec54b1c7a6a9d7a97d8129eb05db4491e1eb/14_latent_factors/06_conditional_autoencoder.ipynb)
+notebooks teach their methods manually; they do not call these model classes. See the
+[Book Guide](../book-guide/index.md) for the verified revision and prerequisites.
+
 This guide covers the structural latent-factor family:
 
 - `PCAModel`

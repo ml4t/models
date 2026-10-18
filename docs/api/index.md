@@ -74,7 +74,7 @@ The package root re-exports the main model classes, configs, batches, results, a
 ## Stability
 
 The [API Stability](../reference/api-stability.md) page defines the public
-surface intended to remain stable through the `0.1` beta series.
+surface for the `0.1` stable line.
 
 ## Integration
 
@@ -92,3 +92,14 @@ surface intended to remain stable through the `0.1` beta series.
 | `ml4t.models.stochastic_discount_factor` | weight-native SDF estimation and return projections |
 | `ml4t.models.asset_prediction` | direct asset-level predictors |
 | `ml4t.models.portfolio` | end-to-end portfolio learners |
+
+## Portfolio model signatures
+
+The portfolio models are imported lazily from `ml4t.models`. Their class signatures are rendered
+here explicitly so all three supported allocators are covered by the generated reference.
+
+::: ml4t.models.portfolio.linear.LinearFeaturePortfolioModel
+
+::: ml4t.models.portfolio.lstm.LSTMPortfolioModel
+
+::: ml4t.models.portfolio.deep_portfolio.DeepPortfolioModel

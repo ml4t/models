@@ -189,3 +189,33 @@ def test_cae_pipeline_forecasts_returns_through_checkpointed_two_step_path() -> 
     assert prediction.factor_forecast.factor_premia.shape == (3, 1)
     assert prediction.asset_forecast.expected_returns.shape == (3, n_assets)
     assert np.isfinite(prediction.asset_forecast.expected_returns).all()
+
+
+@pytest.mark.parametrize(
+    "batch",
+    [
+        CrossSectionBatch(
+            characteristics=np.ones((1, 1, 2), dtype=np.float64),
+            returns=np.ones((1, 1), dtype=np.float64),
+        ),
+        CrossSectionBatch(
+            characteristics=np.ones((2, 3, 2), dtype=np.float64),
+            returns=np.ones((2, 3), dtype=np.float64),
+        ),
+    ],
+)
+def test_cae_rejects_fits_that_never_update_parameters(batch: CrossSectionBatch) -> None:
+    model = CAEModel(
+        CAEConfig(
+            n_factors=1,
+            hidden_units=(4,),
+            n_epochs=2,
+            checkpoint_interval=2,
+            batch_size=1,
+        )
+    )
+
+    with pytest.raises(ValueError, match="updated no parameters"):
+        model.fit(batch)
+
+    assert not model.is_fitted
