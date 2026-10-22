@@ -1,7 +1,8 @@
 # Release Gates
 
-Stable publication promotes the exact wheel and source distribution qualified by the successful
-main-branch CI run. The release workflow does not rebuild either artifact.
+Stable publication starts from the current main commit and runs the reusable CI workflow to build
+and qualify a wheel and source distribution. Publication uses those exact artifacts without
+rebuilding them after qualification.
 
 ## Local Checks
 
@@ -51,5 +52,5 @@ SHA-256 digests in `candidate.json`. Each downstream job verifies that manifest 
 candidate.
 
 A release tag must point to the same commit and match the candidate version exactly. The release
-workflow selects the successful main-branch CI run for that commit, deploys revision-identified
+workflow retains the candidate qualified within that release run, deploys revision-identified
 documentation, verifies the deployed markers, and then publishes the retained distributions.
