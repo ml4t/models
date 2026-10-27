@@ -8,10 +8,10 @@ Finance-specific models for asset pricing, prediction, and portfolio learning.
 - what object it estimates
 - what must still happen before you have an implementable forecast or tradable weight vector
 
-Start with the [bounded CPU Quickstart](getting-started/quickstart.md) for a complete forecast and
+Start with the [CPU Quickstart](getting-started/quickstart.md) for a complete forecast and
 expected result. Use the [task guides](user-guide/index.md) for your own inputs,
-the [API Reference](api/index.md) for exact signatures, and the [Book Guide](book-guide/index.md)
-for verified public teaching notebooks.
+the [API Reference](api/index.md) for functions and parameters, and the [Book Guide](book-guide/index.md)
+for examples from the book.
 
 <div class="grid cards" markdown>
 
