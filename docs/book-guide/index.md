@@ -1,9 +1,7 @@
 # Book Guide
 
-The public companion repository at revision
-[`d2edec54b1c7a6a9d7a97d8129eb05db4491e1eb`](https://github.com/stefan-jansen/machine-learning-for-trading/tree/d2edec54b1c7a6a9d7a97d8129eb05db4491e1eb)
-provides the teaching files below. Every linked path was checked against that revision's Git tree.
-These notebooks explain methods and often use their own data and dependencies. None of the Chapter 14
+Explore financial modeling in the companion notebooks for *Machine Learning for Trading,
+Third Edition*. These notebooks explain methods and often use their own data and dependencies. None of the Chapter 14
 teaching notebooks below imports `ml4t.models`; run the library's small examples for its API.
 
 ## Latent factors and factor forecasts
